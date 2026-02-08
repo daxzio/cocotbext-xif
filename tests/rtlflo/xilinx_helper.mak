@@ -2,7 +2,7 @@ XILINX_REV?=2021.2
 XILINX_PART?=xc7a100tcsg324-1
 CDSLIB?=./cds_${SIM}.lib
 COMPILE_LIBS?=../../libs
-RTLFLO_PATH?=../../rtlflo
+RTLFLO_PATH?=../rtlflo
 
 XILINX_LIB=${COMPILE_LIBS}/${SIM}/xilinx
 ifneq ($(XILINX_VIVADO),)
@@ -16,7 +16,7 @@ else
 CADENCE_VLOG?=ncvlog
 CADENCE_VHDL?=ncvhdl
 endif
-DEFINES += COCOTB_IUS=1
+# DEFINES += COCOTB_IUS=1
 
 ifneq (${USE_CDS},)
     ifeq ($(SIM),xcelium)
@@ -39,19 +39,6 @@ ifneq (${XILINX_BASE},)
 # 	    ${XILINX_BASE}/verilog/src/unisims/FDRE.v \
 # 	    ${XILINX_BASE}/verilog/src/unisims/FDSE.v \
 # 	    ${XILINX_BASE}/verilog/src/unisims/GND.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/LUT1.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/LUT2.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/LUT3.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/LUT4.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/LUT5.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/LUT6.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/MUXF7.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/MUXF8.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/SRL16E.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/SRLC32E.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/OBUFDS.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/BUFG.v \
-# 	    ${XILINX_BASE}/verilog/src/unisims/IBUF.v \
 # 	    ${XILINX_BASE}/verilog/src/unisims/MMCME2_ADV.v 
     
     ifeq ($(SIM), icarus)
@@ -145,6 +132,19 @@ FPGA_DESIGN:=\
     ${EXT_VERILOG_SOURCES} \
     ${INT_VHDL_SOURCES} \
     ${EXT_VHDL_SOURCES}
+
+XILINX_CUSTOM += "\
+    set_msg_config -id {Synth 8-324} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Synth 8-327} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Synth 8-689} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Synth 8-6901} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Synth 8-6841} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Synth 8-7071} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Designutils 20-1280} -new_severity {WARNING}; \
+    set_msg_config -id {Designutils 20-1281} -new_severity {WARNING}; \
+    set_msg_config -id {Place 30-73} -new_severity {WARNING}; \
+    set_msg_config -suppress -id {DRC PDRC-34}; \
+"
 
 vivado_build:
 	@ export XILINX_PART="${XILINX_PART}" ; \

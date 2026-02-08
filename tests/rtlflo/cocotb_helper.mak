@@ -1,10 +1,9 @@
 TOPLEVEL_LANG?=verilog
 TOPLEVEL?=dut
 COCOTB_TEST_MODULES?=test_dut
+RTLFLO_PATH?=../rtlflo
 
-WAVES?=1
-# COCOTB_RESOLVE_X?=ZEROS
-# export COCOTB_RESOLVE_X
+WAVES?=0
 
 ifneq (,$(wildcard ./makefile_synth.mak))
 default: vivado_build
@@ -13,9 +12,9 @@ else
 default: sim
 endif
 
-include ${WORK_BASE}/rtlflo/xilinx_helper.mak
+include ${RTLFLO_PATH}/xilinx_helper.mak
 # Build VERILOG_SOURCES before including Makefile.sim so dependencies work
-VERILOG_DESIGN ?= $(INT_VERILOG_SOURCES) $(SIM_VERILOG_SOURCES) $(EXT_VERILOG_SOURCES) $(XILINX_SIM_SOURCES)
+VERILOG_DESIGN ?= $(EXT_VERILOG_SOURCES) $(INT_VERILOG_SOURCES) $(SIM_VERILOG_SOURCES) $(XILINX_SIM_SOURCES)
 
 VERILOG_SOURCES += $(VERILOG_DESIGN)
 
@@ -24,9 +23,9 @@ VHDL_SOURCES += $(INT_VHDL_SOURCES) $(EXT_VHDL_SOURCES)
 endif
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
-include ${WORK_BASE}/rtlflo/verilator_helper.mak
-include ${WORK_BASE}/rtlflo/verible_helper.mak
-include ${WORK_BASE}/rtlflo/git_helper.mak
+include ${RTLFLO_PATH}/verilator_helper.mak
+include ${RTLFLO_PATH}/verible_helper.mak
+include ${RTLFLO_PATH}/git_helper.mak
 
 # DEFINES += COCOTB_RUNNING=1
 export COCOTB_RUNNING
