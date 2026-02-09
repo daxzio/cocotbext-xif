@@ -161,7 +161,10 @@ XILINX_POST_CUSTOM += \
     set_property source_mgmt_mode All [current_project]; \
     update_compile_order -fileset sources_1; \
 
-vivado_build:
+vivado_clean:
+	rm -rf build-*/
+
+vivado_build: vivado_clean
 	@ export XILINX_PART="${XILINX_PART}" ; \
 	export XILINX_CONSTRAINTS="${XILINX_CONSTRAINTS}" ; \
 	export XILINX_PRE_CUSTOM='${XILINX_PRE_CUSTOM}' ; \
@@ -174,5 +177,3 @@ vivado_build:
 	export FPGA_DESIGN="${FPGA_DESIGN}" ; \
 		${RTLFLO_PATH}/vivado_helper.py
 
-clean::
-	rm -rf build-*/

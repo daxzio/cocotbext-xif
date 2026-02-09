@@ -18,3 +18,7 @@ m3-dapswjdp/
 Untitled
 build*/
 venv*/
+vivado*
+interim.txt
+hs_err_pid*.log
+*.bck

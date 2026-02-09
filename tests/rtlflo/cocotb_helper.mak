@@ -37,6 +37,7 @@ export COCOTB_RUNNING
 ifeq ($(TOPLEVEL_LANG),verilog)
 	ifeq ($(SIM), icarus)
         DEFINES += COCOTB_ICARUS=1
+        SIM_BUILD:=sim_build_icarus
 	else ifeq ($(SIM), ius)
         DEFINES += COCOTB_CADENCE=1
         DEFINES += COCOTB_IUS=1
@@ -49,10 +50,12 @@ ifeq ($(TOPLEVEL_LANG),verilog)
 		COMPILE_ARGS += -disable_sem2009
 		COMPILE_ARGS += -sv
 # 		COMPILE_ARGS += -top ${TOPLEVEL}
+        SIM_BUILD:=sim_build_xcelium
 	else ifeq ($(SIM),verilator)
         DEFINES += COCOTB_VERILATOR=1
 		COMPILE_ARGS += --no-timing
 	    COMPILE_ARGS += ${IGNORE_ARGS}
+        SIM_BUILD:=sim_build_verilator
 	endif
 endif
 
@@ -139,7 +142,7 @@ all_libs_clean::
 waves:
 ifeq ($(SIM), icarus)
 # 	gtkwave dut.vcd &
-	gtkwave sim_build/*.fst &
+	gtkwave ${SIM_BUILD}/*.fst &
 else ifeq ($(SIM), ius)
 	simvision -waves waves.shm &
 else ifeq ($(SIM),verilator)

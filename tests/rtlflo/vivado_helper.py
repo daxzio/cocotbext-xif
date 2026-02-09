@@ -79,7 +79,7 @@ class vivado_helper:
                 d = define.split("=")
                 self.prj.add_define(d[0], d[1])
             else:
-                self.prj.add_define(d)
+                self.prj.add_define(define, 0)
 
         for constraint in self.constraints:
             c = constraint.split(",")
