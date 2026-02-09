@@ -3,7 +3,8 @@
 SIM ?= verilator
 export SIM
 TOPLEVEL_LANG = verilog
-WORK_BASE ?= ..
+# WORK_BASE ?= ..
+RTLFLO_PATH?=../rtlflo
 ARA_ROOT ?= ../rtl/ara
 # Fallback to ara.bck if CVA6 deps are missing (e.g. ara is a symlink to an Ara repo without deps)
 ARA_CVA6_CONFIG := $(CURDIR)/$(ARA_ROOT)/hardware/deps/cva6/core/include/config_pkg.sv
@@ -17,9 +18,9 @@ MODULE = test_dut
 
 # ---------- Include dirs (coprocessor only) ----------
 VERILOG_INCLUDE_DIRS += \
-	$(ASIC_DIR)/ara.bck/hardware/deps/common_cells/include \
-	$(ASIC_DIR)/ara.bck/hardware/deps/axi/include \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/include \
+	$(ASIC_DIR)/common_cells/include \
+	$(ASIC_DIR)/axi/include \
+	$(ASIC_DIR)/cva6/core/include \
 	$(ASIC_DIR)/ara/hardware/include
 
 # ---------- Defines ----------
@@ -33,23 +34,23 @@ DEFINES += \
 # Omitted: wt_cache_pkg, std_cache_pkg (CVA6 cache); fpga-support-stubs, tc_sram_wrapper*,
 # sram_pulp, sram_cache (CVA6 SoC/cache). Ara VRF uses tc_sram from tech_cells_generic.
 EXT_VERILOG_SOURCES += \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/include/config_pkg.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/include/cv64a6_imafdcv_sv39_config_pkg.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/include/riscv_pkg.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/include/ariane_pkg.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/include/build_config_pkg.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/cva6/core/serdiv.sv
+	$(ASIC_DIR)/cva6/core/include/config_pkg.sv \
+	$(ASIC_DIR)/cva6/core/include/cv64a6_imafdcv_sv39_config_pkg.sv \
+	$(ASIC_DIR)/cva6/core/include/riscv_pkg.sv \
+	$(ASIC_DIR)/cva6/core/include/ariane_pkg.sv \
+	$(ASIC_DIR)/cva6/core/include/build_config_pkg.sv \
+	$(ASIC_DIR)/cva6/core/serdiv.sv
 
 # ---------- AXI (pkg + intf for types; axi_cut, axi_to_detailed_mem, axi_zero_mem) ----------
 EXT_VERILOG_SOURCES += \
-	$(ASIC_DIR)/ara.bck/hardware/deps/axi/src/axi_pkg.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/axi/src/axi_intf.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/axi/src/axi_cut.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/axi/src/axi_to_detailed_mem.sv \
-	$(ASIC_DIR)/ara.bck/hardware/deps/axi/src/axi_zero_mem.sv
+	$(ASIC_DIR)/axi/src/axi_pkg.sv \
+	$(ASIC_DIR)/axi/src/axi_intf.sv \
+	$(ASIC_DIR)/axi/src/axi_cut.sv \
+	$(ASIC_DIR)/axi/src/axi_to_detailed_mem.sv \
+	$(ASIC_DIR)/axi/src/axi_zero_mem.sv
 
 # ---------- Common cells (from hierarchy + packages/deps needed by above) ----------
-COMMON_CELLS := $(ASIC_DIR)/ara.bck/hardware/deps/common_cells
+COMMON_CELLS := $(ASIC_DIR)/common_cells
 EXT_VERILOG_SOURCES += \
 	$(COMMON_CELLS)/src/cf_math_pkg.sv \
 	$(COMMON_CELLS)/src/spill_register.sv \
@@ -74,8 +75,8 @@ EXT_VERILOG_SOURCES += \
 
 # ---------- FPnew (ara_pkg + lane vmfpu), tech_cells (VRF), common_cells extras ----------
 FPNEW := $(ASIC_DIR)/ara.bck/hardware/deps/fpnew
-FPDS := $(ASIC_DIR)/ara.bck/hardware/deps/fpu_div_sqrt_mvp
-TC := $(ASIC_DIR)/ara.bck/hardware/deps/tech_cells_generic
+FPDS := $(ASIC_DIR)/fpu_div_sqrt_mvp
+TC := $(ASIC_DIR)/tech_cells_generic
 EXT_VERILOG_SOURCES += \
 	$(FPNEW)/src/fpnew_pkg.sv \
 	$(FPNEW)/src/fpnew_rounding.sv \
@@ -147,16 +148,6 @@ INT_VERILOG_SOURCES += \
 	./ara_xif_core.sv \
     ./ara_xif_wrapper.sv
 
-# # Full source list for Verilator (used by hierarchy target; unchanged by SIM=icarus)
-# ARA_VERILATOR_SOURCES := $(INT_VERILOG_SOURCES) $(EXT_VERILOG_SOURCES)
-# 
-# # ---------- Icarus: use single .v from sv2v; run 'make sv2v' first ----------
-# ARA_SV_FOR_SV2V := $(EXT_VERILOG_SOURCES) $(INT_VERILOG_SOURCES)
-# ifeq ($(SIM),icarus)
-# INT_VERILOG_SOURCES := ./ara_xif_wrapper.v
-# EXT_VERILOG_SOURCES :=
-# endif
-
 # ---------- Verilator waivers (Ara/FPnew RTL); one per line to comment out when debugging ----------
 IGNORE_ARGS += -Wno-UNOPTFLAT
 IGNORE_ARGS += -Wno-ASCRANGE
@@ -174,38 +165,25 @@ IGNORE_ARGS += -Wno-SIDEEFFECT
 # Parallel Verilator C++ build (large speedup). Override with BUILD_ARGS= if needed.
 BUILD_ARGS += -j$(shell nproc 2>/dev/null || echo 8)
 
+ifeq ($(SIM),icarus)
+INT_VERILOG_SOURCES := ./ara_xif_wrapper.v
+EXT_VERILOG_SOURCES :=
+endif
 
-include $(WORK_BASE)/rtlflo/cocotb_helper.mak
+include $(RTLFLO_PATH)/cocotb_helper.mak
 
-# # ---------- sv2v: convert all Ara SV to one Verilog file for Icarus ----------
-# .PHONY: sv2v
-# sv2v: ara_xif_wrapper.v
-# 
-# # Defines for sv2v (same as RTL; VERILATOR strips assertion blocks in AXI RTL)
 # ARA_SV2V_DEFINES := NR_LANES=2 VLEN=128 ARIANE_ACCELERATOR_PORT=1 COMMON_CELLS_ASSERTS_OFF VERILATOR
-# 
-# ara_xif_wrapper.v: $(ARA_SV_FOR_SV2V)
-# 	sv2v $(addprefix -I, $(VERILOG_INCLUDE_DIRS)) $(addprefix -D, $(ARA_SV2V_DEFINES)) \
-# 		--top $(TOPLEVEL) $(ARA_SV_FOR_SV2V) --write=ara_xif_wrapper.v
-# 
-# # Icarus: sim.vvp depends on sv2v-generated .v
-# ifeq ($(SIM),icarus)
-# $(SIM_BUILD)/sim.vvp: ara_xif_wrapper.v
-# # Remind if .v is missing (e.g. sv2v not run or failed on Ara RTL)
-# _icarus_check := $(if $(wildcard ara_xif_wrapper.v),,$(warning Run 'make sv2v' first. If sv2v fails, Ara RTL may use SV that sv2v does not support; use SIM=verilator or fix the reported file.))
-# endif
-# 
-# # ---------- Hierarchy: instance name, module type, source file (Verilator --json-only) ----------
-# HIERARCHY_DIR := .hierarchy
-# HIERARCHY_JSON := $(HIERARCHY_DIR)/V$(TOPLEVEL).tree.json
-# HIERARCHY_META := $(HIERARCHY_DIR)/V$(TOPLEVEL).tree.meta.json
-# 
-# .PHONY: hierarchy
-# hierarchy: $(HIERARCHY_JSON)
-# 	python3 $(WORK_BASE)/rtlflo/scripts/verilator_hierarchy.py $(HIERARCHY_JSON) $(HIERARCHY_META) --top $(TOPLEVEL)
-# 
-# $(HIERARCHY_JSON): $(ARA_VERILATOR_SOURCES)
-# 	@mkdir -p $(HIERARCHY_DIR)
-# 	verilator --json-only -Mdir $(HIERARCHY_DIR) --top-module $(TOPLEVEL) \
-# 		$(VINCLUDE_ARGS) $(addprefix -D, $(DEFINES)) $(IGNORE_ARGS) \
-# 		$(ARA_VERILATOR_SOURCES)
+SV2V_STRIP_DPI := $(RTLFLO_PATH)/scripts/strip_dpi_verilog.py
+SV2V_FIX_CONSTFUNC := $(RTLFLO_PATH)/scripts/fix_fpnew_constfunc_verilog.py
+
+sv2v: $(SV2V_STRIP_DPI) $(SV2V_FIX_CONSTFUNC)
+	sv2v \
+        $(addprefix -I, $(VERILOG_INCLUDE_DIRS)) \
+        $(addprefix -D, $(DEFINES)) -DVERILATOR \
+		--top $(TOPLEVEL) $(EXT_VERILOG_SOURCES)  $(INT_VERILOG_SOURCES) \
+        --write=ara_xif_wrapper_temp.v
+	python3 $(RTLFLO_PATH)/scripts/strip_dpi_verilog.py ara_xif_wrapper_temp.v ara_xif_wrapper.v
+	python3 $(RTLFLO_PATH)/scripts/fix_fpnew_constfunc_verilog.py ara_xif_wrapper.v
+	@rm -f ara_xif_wrapper_temp.v 
+
+
