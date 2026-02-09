@@ -40,10 +40,15 @@ class vivado_helper:
                     continue
                 self.constraints.append(x.rstrip().lstrip())
 
-        self.customs = []
-        if "XILINX_CUSTOM" in os.environ:
-            for x in os.environ["XILINX_CUSTOM"].split(";"):
-                self.customs.append(x.rstrip().lstrip())
+        self.pre_customs = []
+        if "XILINX_PRE_CUSTOM" in os.environ:
+            for x in os.environ["XILINX_PRE_CUSTOM"].split(";"):
+                self.pre_customs.append(x.rstrip().lstrip())
+
+        self.post_customs = []
+        if "XILINX_POST_CUSTOM" in os.environ:
+            for x in os.environ["XILINX_POST_CUSTOM"].split(";"):
+                self.post_customs.append(x.rstrip().lstrip())
 
         self.include_dirs = []
         if "VERILOG_INCLUDE_DIRS" in os.environ:
@@ -62,8 +67,8 @@ class vivado_helper:
 #         self.prj.clean()
         self.prj.set_part(self.part)
 
-        for custom in self.customs:
-            self.prj.add_hook('precfg', custom)
+        for pre_custom in self.pre_customs:
+            self.prj.add_hook('precfg', pre_custom)
 
         for generic in self.generics:
             g = generic.split("=")
@@ -97,8 +102,12 @@ class vivado_helper:
             self.prj.add_vlog(file)
         self.prj.set_top(self.top)
 #         self.prj.add_define("FPGA", 1)
-
+#         self.prj.add_hook('postcfg', "set_property source_mgmt_mode All [current_project]")
+#         self.prj.add_hook('postcfg', "update_compile_order -fileset sources_1")
 #         self.prj.generate("prj")
+        for custom in self.post_customs:
+            self.prj.add_hook('postcfg', custom)
+
         self.prj.make(last='cfg')
 
     def generate_bitstream(self):

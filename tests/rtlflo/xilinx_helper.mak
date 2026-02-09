@@ -3,12 +3,18 @@ XILINX_PART?=xc7a100tcsg324-1
 CDSLIB?=./cds_${SIM}.lib
 COMPILE_LIBS?=../../libs
 RTLFLO_PATH?=../rtlflo
+RTLFLO_PATH:=$(abspath ${RTLFLO_PATH})
+
+SYNTH_TOP?=${TOPLEVEL}
+BUILD_NAME?=${SYNTH_TOP}
+
 
 XILINX_LIB=${COMPILE_LIBS}/${SIM}/xilinx
 ifneq ($(XILINX_VIVADO),)
 XILINX_BASE?=${XILINX_VIVADO}/data
 XILINX_LIB=${COMPILE_LIBS}/${SIM}/xilinx-${XILINX_REV}
 endif
+
 ifeq ($(SIM),xcelium)
 CADENCE_VLOG?=xmvlog
 CADENCE_VHDL?=xmvhdl
@@ -133,7 +139,7 @@ FPGA_DESIGN:=\
     ${INT_VHDL_SOURCES} \
     ${EXT_VHDL_SOURCES}
 
-XILINX_CUSTOM += "\
+XILINX_CUSTOM += \
     set_msg_config -id {Synth 8-324} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-327} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-689} -new_severity {CRITICAL WARNING}; \
@@ -144,12 +150,22 @@ XILINX_CUSTOM += "\
     set_msg_config -id {Designutils 20-1281} -new_severity {WARNING}; \
     set_msg_config -id {Place 30-73} -new_severity {WARNING}; \
     set_msg_config -suppress -id {DRC PDRC-34}; \
-"
+
+XILINX_CUSTOM += \
+    add_files -fileset utils_1 -norecurse ${RTLFLO_PATH}/post_bitstream.tcl; \
+    add_files -fileset utils_1 -norecurse ${RTLFLO_PATH}/pre_synth.tcl; \
+    set_property STEPS.SYNTH_DESIGN.TCL.PRE [ get_files ${RTLFLO_PATH}/pre_synth.tcl -of [get_fileset utils_1] ] [get_runs synth_1];\
+    set_property STEPS.WRITE_BITSTREAM.TCL.POST [ get_files ${RTLFLO_PATH}/post_bitstream.tcl -of [get_fileset utils_1] ] [get_runs impl_1];\
+
+XILINX_POST_CUSTOM += \
+    set_property source_mgmt_mode All [current_project]; \
+    update_compile_order -fileset sources_1; \
 
 vivado_build:
 	@ export XILINX_PART="${XILINX_PART}" ; \
 	export XILINX_CONSTRAINTS="${XILINX_CONSTRAINTS}" ; \
-	export XILINX_CUSTOM=${XILINX_CUSTOM} ; \
+	export XILINX_PRE_CUSTOM='${XILINX_CUSTOM}' ; \
+	export XILINX_POST_CUSTOM='${XILINX_POST_CUSTOM}' ; \
 	export SYNTH_TOP=${SYNTH_TOP} ; \
 	export BUILD_NAME=${BUILD_NAME} ; \
 	export VERILOG_INCLUDE_DIRS="${VERILOG_INCLUDE_DIRS}" ; \

@@ -3,6 +3,7 @@
 SIM ?= verilator
 TOPLEVEL_LANG = verilog
 RTLFLO_PATH?=../rtlflo
+RTLFLO_PATH := $(abspath $(RTLFLO_PATH))
 ASIC_DIR ?= ../rtl
 
 TOPLEVEL = fpu_ss_wrapper
@@ -92,6 +93,13 @@ IGNORE_ARGS += -Wno-ASCRANGE
 IGNORE_ARGS += -Wno-WIDTHEXPAND
 IGNORE_ARGS += -Wno-WIDTHTRUNC
 IGNORE_ARGS += -Wno-UNSIGNED
+
+XILINX_CUSTOM +=\
+    set_msg_config -id {HDL 9-1206} -new_severity {ADVISORY}; \
+    set_msg_config -id {HDL 9-3952} -new_severity {ADVISORY}; \
+
+
+
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
 

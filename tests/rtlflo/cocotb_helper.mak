@@ -2,6 +2,7 @@ TOPLEVEL_LANG?=verilog
 TOPLEVEL?=dut
 COCOTB_TEST_MODULES?=test_dut
 RTLFLO_PATH?=../rtlflo
+RTLFLO_PATH:=$(abspath ${RTLFLO_PATH})
 
 WAVES?=0
 
