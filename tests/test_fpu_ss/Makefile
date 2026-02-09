@@ -3,7 +3,6 @@
 SIM ?= verilator
 TOPLEVEL_LANG = verilog
 RTLFLO_PATH?=../rtlflo
-RTLFLO_PATH := $(abspath $(RTLFLO_PATH))
 ASIC_DIR ?= ../rtl
 
 TOPLEVEL = fpu_ss_wrapper
@@ -43,8 +42,8 @@ EXT_VERILOG_SOURCES += \
 	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/iteration_div_sqrt_mvp.sv \
 	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv \
 	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv \
-	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv \
-	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv
+	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv \
+# 	$(ASIC_DIR)/fpnew/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv \
 
 # common_cells (used by fpnew: lzc, rr_arb_tree, registers.svh)
 EXT_VERILOG_SOURCES += \
@@ -82,10 +81,10 @@ sv2v:
 
 # # ---------- Icarus: use single .v from sv2v; run 'make sv2v' first ----------
 # FPU_SS_SV_FOR_SV2V := $(EXT_VERILOG_SOURCES)
-# ifeq ($(SIM),icarus)
-# INT_VERILOG_SOURCES := ./fpu_ss_wrapper.v
-# EXT_VERILOG_SOURCES :=
-# endif
+ifeq ($(SIM),icarus)
+INT_VERILOG_SOURCES := ./fpu_ss_wrapper.v
+EXT_VERILOG_SOURCES :=
+endif
 
 # Verilator waivers for fpnew/fpu_div_sqrt_mvp/common_cells RTL
 IGNORE_ARGS += -Wno-UNOPTFLAT
@@ -94,12 +93,9 @@ IGNORE_ARGS += -Wno-WIDTHEXPAND
 IGNORE_ARGS += -Wno-WIDTHTRUNC
 IGNORE_ARGS += -Wno-UNSIGNED
 
-XILINX_CUSTOM +=\
+XILINX_PRE_CUSTOM +=\
     set_msg_config -id {HDL 9-1206} -new_severity {ADVISORY}; \
     set_msg_config -id {HDL 9-3952} -new_severity {ADVISORY}; \
-
-
-
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
 

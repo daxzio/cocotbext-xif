@@ -139,7 +139,7 @@ FPGA_DESIGN:=\
     ${INT_VHDL_SOURCES} \
     ${EXT_VHDL_SOURCES}
 
-XILINX_CUSTOM += \
+XILINX_PRE_CUSTOM += \
     set_msg_config -id {Synth 8-324} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-327} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-689} -new_severity {CRITICAL WARNING}; \
@@ -151,7 +151,7 @@ XILINX_CUSTOM += \
     set_msg_config -id {Place 30-73} -new_severity {WARNING}; \
     set_msg_config -suppress -id {DRC PDRC-34}; \
 
-XILINX_CUSTOM += \
+XILINX_PRE_CUSTOM += \
     add_files -fileset utils_1 -norecurse ${RTLFLO_PATH}/post_bitstream.tcl; \
     add_files -fileset utils_1 -norecurse ${RTLFLO_PATH}/pre_synth.tcl; \
     set_property STEPS.SYNTH_DESIGN.TCL.PRE [ get_files ${RTLFLO_PATH}/pre_synth.tcl -of [get_fileset utils_1] ] [get_runs synth_1];\
@@ -164,7 +164,7 @@ XILINX_POST_CUSTOM += \
 vivado_build:
 	@ export XILINX_PART="${XILINX_PART}" ; \
 	export XILINX_CONSTRAINTS="${XILINX_CONSTRAINTS}" ; \
-	export XILINX_PRE_CUSTOM='${XILINX_CUSTOM}' ; \
+	export XILINX_PRE_CUSTOM='${XILINX_PRE_CUSTOM}' ; \
 	export XILINX_POST_CUSTOM='${XILINX_POST_CUSTOM}' ; \
 	export SYNTH_TOP=${SYNTH_TOP} ; \
 	export BUILD_NAME=${BUILD_NAME} ; \
@@ -173,3 +173,6 @@ vivado_build:
 	export DEFINES="${XILINX_DEFINES}" ; \
 	export FPGA_DESIGN="${FPGA_DESIGN}" ; \
 		${RTLFLO_PATH}/vivado_helper.py
+
+clean::
+	rm -rf build-*/
