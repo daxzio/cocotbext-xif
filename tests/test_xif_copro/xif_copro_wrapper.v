@@ -800,6 +800,8 @@ module xif_copro_wrapper (
 	s_xif_issue_req_rs_0,
 	s_xif_issue_req_rs_1,
 	s_xif_issue_req_rs_valid,
+	s_xif_issue_req_ecs,
+	s_xif_issue_req_ecs_valid,
 	s_xif_issue_ready,
 	s_xif_issue_resp_accept,
 	s_xif_issue_resp_writeback,
@@ -807,20 +809,6 @@ module xif_copro_wrapper (
 	s_xif_issue_resp_dualread,
 	s_xif_issue_resp_loadstore,
 	s_xif_issue_resp_exc,
-	z_xif_issue_valid,
-	z_xif_issue_ready,
-	z_xif_issue_req_instr,
-	z_xif_issue_req_mode,
-	z_xif_issue_req_id,
-	z_xif_issue_req_rs_0,
-	z_xif_issue_req_rs_1,
-	z_xif_issue_req_rs_valid,
-	z_xif_issue_resp_accept,
-	z_xif_issue_resp_writeback,
-	z_xif_issue_resp_dualwrite,
-	z_xif_issue_resp_dualread,
-	z_xif_issue_resp_loadstore,
-	z_xif_issue_resp_exc,
 	s_xif_commit_valid,
 	s_xif_commit_id,
 	s_xif_commit_kill,
@@ -836,10 +824,12 @@ module xif_copro_wrapper (
 	s_xif_mem_req_last,
 	s_xif_mem_resp_exc,
 	s_xif_mem_resp_exccode,
+	s_xif_mem_resp_dbg,
 	s_xif_mem_result_valid,
 	s_xif_mem_result_id,
 	s_xif_mem_result_rdata,
 	s_xif_mem_result_err,
+	s_xif_mem_result_dbg,
 	s_xif_result_valid,
 	s_xif_result_ready,
 	s_xif_result_id,
@@ -847,7 +837,10 @@ module xif_copro_wrapper (
 	s_xif_result_rd,
 	s_xif_result_we,
 	s_xif_result_exc,
-	s_xif_result_exccode
+	s_xif_result_exccode,
+	s_xif_result_dbg,
+	s_xif_compressed_valid,
+	s_xif_compressed_req
 );
 	input wire clk_i;
 	input wire rst_ni;
@@ -858,6 +851,8 @@ module xif_copro_wrapper (
 	input wire [31:0] s_xif_issue_req_rs_0;
 	input wire [31:0] s_xif_issue_req_rs_1;
 	input wire [1:0] s_xif_issue_req_rs_valid;
+	input wire [5:0] s_xif_issue_req_ecs;
+	input wire s_xif_issue_req_ecs_valid;
 	output wire s_xif_issue_ready;
 	output wire s_xif_issue_resp_accept;
 	output wire s_xif_issue_resp_writeback;
@@ -865,20 +860,6 @@ module xif_copro_wrapper (
 	output wire [2:0] s_xif_issue_resp_dualread;
 	output wire s_xif_issue_resp_loadstore;
 	output wire s_xif_issue_resp_exc;
-	input wire z_xif_issue_valid;
-	output wire z_xif_issue_ready;
-	input wire [31:0] z_xif_issue_req_instr;
-	input wire [1:0] z_xif_issue_req_mode;
-	input wire [3:0] z_xif_issue_req_id;
-	input wire [31:0] z_xif_issue_req_rs_0;
-	input wire [31:0] z_xif_issue_req_rs_1;
-	input wire [1:0] z_xif_issue_req_rs_valid;
-	output wire z_xif_issue_resp_accept;
-	output wire z_xif_issue_resp_writeback;
-	output wire z_xif_issue_resp_dualwrite;
-	output wire [2:0] z_xif_issue_resp_dualread;
-	output wire z_xif_issue_resp_loadstore;
-	output wire z_xif_issue_resp_exc;
 	input wire s_xif_commit_valid;
 	input wire [3:0] s_xif_commit_id;
 	input wire s_xif_commit_kill;
@@ -894,10 +875,12 @@ module xif_copro_wrapper (
 	output wire s_xif_mem_req_last;
 	input wire s_xif_mem_resp_exc;
 	input wire [5:0] s_xif_mem_resp_exccode;
+	input wire s_xif_mem_resp_dbg;
 	input wire s_xif_mem_result_valid;
 	input wire [3:0] s_xif_mem_result_id;
 	input wire [31:0] s_xif_mem_result_rdata;
 	input wire s_xif_mem_result_err;
+	input wire s_xif_mem_result_dbg;
 	output wire s_xif_result_valid;
 	input wire s_xif_result_ready;
 	output wire [3:0] s_xif_result_id;
@@ -906,6 +889,9 @@ module xif_copro_wrapper (
 	output wire s_xif_result_we;
 	output wire s_xif_result_exc;
 	output wire [5:0] s_xif_result_exccode;
+	output wire s_xif_result_dbg;
+	input wire s_xif_compressed_valid;
+	input wire [21:0] s_xif_compressed_req;
 	generate
 		if (1) begin : ext_if
 			localparam signed [31:0] X_NUM_RS = 2;
@@ -947,8 +933,8 @@ module xif_copro_wrapper (
 	assign ext_if.issue_req[((32'sd2 * 32'sd32) + 8) - ((32'sd2 * 32'sd32) - 1)+:32'sd32] = s_xif_issue_req_rs_0;
 	assign ext_if.issue_req[((32'sd2 * 32'sd32) + 8) - ((32'sd2 * 32'sd32) - 33)+:32'sd32] = s_xif_issue_req_rs_1;
 	assign ext_if.issue_req[8-:2] = s_xif_issue_req_rs_valid;
-	assign ext_if.issue_req[6-:6] = 6'h00;
-	assign ext_if.issue_req[0] = 1'b0;
+	assign ext_if.issue_req[6-:6] = s_xif_issue_req_ecs;
+	assign ext_if.issue_req[0] = s_xif_issue_req_ecs_valid;
 	assign s_xif_issue_resp_accept = ext_if.issue_resp[8];
 	assign s_xif_issue_resp_writeback = ext_if.issue_resp[7];
 	assign s_xif_issue_resp_dualwrite = ext_if.issue_resp[6];
@@ -970,12 +956,12 @@ module xif_copro_wrapper (
 	assign s_xif_mem_req_last = ext_if.mem_req[1];
 	assign ext_if.mem_resp[7] = s_xif_mem_resp_exc;
 	assign ext_if.mem_resp[6-:6] = s_xif_mem_resp_exccode;
-	assign ext_if.mem_resp[0] = 1'b0;
+	assign ext_if.mem_resp[0] = s_xif_mem_resp_dbg;
 	assign ext_if.mem_result_valid = s_xif_mem_result_valid;
 	assign ext_if.mem_result[37-:4] = s_xif_mem_result_id;
 	assign ext_if.mem_result[33-:32] = s_xif_mem_result_rdata;
 	assign ext_if.mem_result[1] = s_xif_mem_result_err;
-	assign ext_if.mem_result[0] = 1'b0;
+	assign ext_if.mem_result[0] = s_xif_mem_result_dbg;
 	assign s_xif_result_valid = ext_if.result_valid;
 	assign ext_if.result_ready = s_xif_result_ready;
 	assign s_xif_result_id = ext_if.result[41 + ((32'sd32 / 32'sd32) + 17)-:((41 + ((32'sd32 / 32'sd32) + 17)) >= (37 + ((32'sd32 / 32'sd32) + 18)) ? ((41 + ((32'sd32 / 32'sd32) + 17)) - (37 + ((32'sd32 / 32'sd32) + 18))) + 1 : ((37 + ((32'sd32 / 32'sd32) + 18)) - (41 + ((32'sd32 / 32'sd32) + 17))) + 1)];
@@ -984,8 +970,8 @@ module xif_copro_wrapper (
 	assign s_xif_result_we = ext_if.result[(32'sd32 / 32'sd32) + 17-:(((32'sd32 / 32'sd32) + 17) >= 18 ? (32'sd32 / 32'sd32) + 0 : 19 - ((32'sd32 / 32'sd32) + 17))];
 	assign s_xif_result_exc = ext_if.result[8];
 	assign s_xif_result_exccode = ext_if.result[7-:6];
-	assign ext_if.compressed_valid = 1'b0;
-	assign ext_if.compressed_req = 1'sb0;
+	assign ext_if.compressed_valid = s_xif_compressed_valid;
+	assign ext_if.compressed_req = s_xif_compressed_req;
 	localparam _param_67078_INPUT_BUFFER_DEPTH = 1;
 	localparam _param_67078_FORWARDING = 1;
 	generate

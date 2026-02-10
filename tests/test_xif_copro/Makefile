@@ -9,7 +9,7 @@ VERILOG_INCLUDE_DIRS = \
    ${ASIC_DIR}/rtl
    
 TOPLEVEL = xif_copro_wrapper
-MODULE = test_dut
+MODULE?=test_dut
 
 ifeq ($(SIM), icarus)
 INT_VERILOG_SOURCES += \

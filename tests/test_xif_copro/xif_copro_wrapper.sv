@@ -15,6 +15,8 @@ module xif_copro_wrapper (
   input  logic [31:0] s_xif_issue_req_rs_0,
   input  logic [31:0] s_xif_issue_req_rs_1,
   input  logic [1:0]  s_xif_issue_req_rs_valid,
+  input  logic [5:0]  s_xif_issue_req_ecs,
+  input  logic        s_xif_issue_req_ecs_valid,
   output logic        s_xif_issue_ready,
   output logic        s_xif_issue_resp_accept,
   output logic        s_xif_issue_resp_writeback,
@@ -22,21 +24,6 @@ module xif_copro_wrapper (
   output logic [2:0]  s_xif_issue_resp_dualread,
   output logic        s_xif_issue_resp_loadstore,
   output logic        s_xif_issue_resp_exc,
-  
-  input  logic        z_xif_issue_valid,
-  output logic        z_xif_issue_ready,
-  input  logic [31:0] z_xif_issue_req_instr,
-  input  logic [1:0]  z_xif_issue_req_mode,
-  input  logic [3:0]  z_xif_issue_req_id,
-  input  logic [31:0] z_xif_issue_req_rs_0,
-  input  logic [31:0] z_xif_issue_req_rs_1,
-  input  logic [1:0]  z_xif_issue_req_rs_valid,
-  output logic        z_xif_issue_resp_accept,
-  output logic        z_xif_issue_resp_writeback,
-  output logic        z_xif_issue_resp_dualwrite,
-  output logic [2:0]  z_xif_issue_resp_dualread,
-  output logic        z_xif_issue_resp_loadstore,
-  output logic        z_xif_issue_resp_exc,
   
   // Commit Interface (CPU -> Coprocessor)
   input  logic        s_xif_commit_valid,
@@ -56,12 +43,14 @@ module xif_copro_wrapper (
   output logic        s_xif_mem_req_last,
   input  logic        s_xif_mem_resp_exc,
   input  logic [5:0]  s_xif_mem_resp_exccode,
+  input  logic        s_xif_mem_resp_dbg,
   
   // Memory Result Interface (CPU -> Coprocessor)
   input  logic        s_xif_mem_result_valid,
   input  logic [3:0]  s_xif_mem_result_id,
   input  logic [31:0] s_xif_mem_result_rdata,
   input  logic        s_xif_mem_result_err,
+  input  logic        s_xif_mem_result_dbg,
   
   // Result Interface (Coprocessor -> CPU)
   output logic        s_xif_result_valid,
@@ -71,7 +60,10 @@ module xif_copro_wrapper (
   output logic [4:0]  s_xif_result_rd,
   output logic        s_xif_result_we,
   output logic        s_xif_result_exc,
-  output logic [5:0]  s_xif_result_exccode
+  output logic [5:0]  s_xif_result_exccode,
+  output logic        s_xif_result_dbg,
+  input  logic        s_xif_compressed_valid,
+  input  logic [21:0] s_xif_compressed_req
 );
 
   // Internal XIF interface
@@ -90,8 +82,8 @@ module xif_copro_wrapper (
   assign ext_if.issue_req.rs[0]         = s_xif_issue_req_rs_0;
   assign ext_if.issue_req.rs[1]         = s_xif_issue_req_rs_1;
   assign ext_if.issue_req.rs_valid      = s_xif_issue_req_rs_valid;
-  assign ext_if.issue_req.ecs           = 6'h0;
-  assign ext_if.issue_req.ecs_valid     = 1'b0;
+  assign ext_if.issue_req.ecs           = s_xif_issue_req_ecs;
+  assign ext_if.issue_req.ecs_valid     = s_xif_issue_req_ecs_valid;
   assign s_xif_issue_resp_accept        = ext_if.issue_resp.accept;
   assign s_xif_issue_resp_writeback     = ext_if.issue_resp.writeback;
   assign s_xif_issue_resp_dualwrite     = ext_if.issue_resp.dualwrite;
@@ -117,14 +109,14 @@ module xif_copro_wrapper (
   assign s_xif_mem_req_last             = ext_if.mem_req.last;
   assign ext_if.mem_resp.exc            = s_xif_mem_resp_exc;
   assign ext_if.mem_resp.exccode        = s_xif_mem_resp_exccode;
-  assign ext_if.mem_resp.dbg            = 1'b0;
+  assign ext_if.mem_resp.dbg            = s_xif_mem_resp_dbg;
   
   // Memory Result Interface - CPU to Coprocessor
   assign ext_if.mem_result_valid        = s_xif_mem_result_valid;
   assign ext_if.mem_result.id           = s_xif_mem_result_id;
   assign ext_if.mem_result.rdata        = s_xif_mem_result_rdata;
   assign ext_if.mem_result.err          = s_xif_mem_result_err;
-  assign ext_if.mem_result.dbg          = 1'b0;
+  assign ext_if.mem_result.dbg          = s_xif_mem_result_dbg;
   
   // Result Interface - Coprocessor to CPU
   assign s_xif_result_valid             = ext_if.result_valid;
@@ -137,8 +129,8 @@ module xif_copro_wrapper (
   assign s_xif_result_exccode           = ext_if.result.exccode;
   
   // Tie off unused compressed interface
-  assign ext_if.compressed_valid        = 1'b0;
-  assign ext_if.compressed_req          = '0;
+  assign ext_if.compressed_valid        = s_xif_compressed_valid;
+  assign ext_if.compressed_req          = s_xif_compressed_req;
 
   // ==========================================
   // Instantiate Coprocessor
