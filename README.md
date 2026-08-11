@@ -61,7 +61,7 @@ bus = XifBus.from_prefix(dut, "s_xif")
 
 ### XIF Host
 
-`XifHost` is the preferred CPU/host-side driver. It issues instructions on the XIF, handles commit, and checks results.
+`XifHost` is the CPU/host-side driver. It issues instructions on the XIF, handles commit, and checks results.
 
 ```python
 from cocotbext.xif import XifBus, XifHost
@@ -70,10 +70,8 @@ bus = XifBus.from_prefix(dut, "s_xif")
 xif = XifHost(bus, dut.clk_i)
 
 # Subclass to customize instruction encoding / expected result, then:
-await xif.write_xx(rs0=0xDEADBEEF, expected_val=0xF77DB57B)
+await xif.exec(rs0=0xDEADBEEF, expected_val=0xF77DB57B)
 ```
-
-`XifMaster` is a deprecated alias that subclasses `XifHost` (kept for compatibility). Prefer `XifHost` in new code.
 
 #### `XifHost` constructor parameters
 
@@ -88,7 +86,8 @@ await xif.write_xx(rs0=0xDEADBEEF, expected_val=0xF77DB57B)
 * `calc_result(rs0, rs1, expected_val=-1)`: compute or pass through the expected result (override as needed)
 * `commit(id, wait_cycle=1, kill=0)`: drive the commit channel
 * `result(id, expected_val=-1)`: wait for and check the result channel
-* `write_xx(rs0=0, rs1=0, expected_val=-1, mode=XifMode.MMODE)`: issue an instruction with source registers, commit, and check the result
+* `exec(rs0=0, rs1=0, expected_val=-1, mode=XifMode.MMODE)`: issue the subclass instruction (`calc_instr`), commit, and check the result
+* `exec_insn(instr, rs0=0, rs1=0, ...)`: issue an explicit instruction word, commit, and check the result
 
 Privilege mode values are in `XifMode` (`UMODE`, `SMODE`, `MMODE`).
 
@@ -132,16 +131,9 @@ monitor.enable_logging()
 
 ### XIF Device / RAM
 
-`XifDevice` is the preferred device-side responder name. `XifSlave` remains as a deprecated alias subclassing `XifDevice`. `XifRam` extends `XifDevice` with an in-memory backing store.
+`XifDevice` is the device-side responder. `XifRam` extends `XifDevice` with an in-memory backing store.
 
 These classes are still evolving; see the package sources and tests for current capabilities.
-
-### Naming
-
-| Preferred | Deprecated alias |
-|-----------|------------------|
-| `XifHost` | `XifMaster` |
-| `XifDevice` | `XifSlave` |
 
 ## Running tests
 

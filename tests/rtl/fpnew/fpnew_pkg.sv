@@ -85,20 +85,15 @@ package fpnew_pkg;
   } int_format_e;
 
   // Returns the width of an INT format by index
+  // Note: default case returns INT8 (no $fatal) so this can be used as a constant function
+  // after conversion by sv2v (which would inject $time and break Icarus).
   function automatic int unsigned int_width(int_format_e ifmt);
     unique case (ifmt)
       INT8:  return 8;
       INT16: return 16;
       INT32: return 32;
       INT64: return 64;
-      default: begin
-        // pragma translate_off
-        $fatal(1, "Invalid INT format supplied");
-        // pragma translate_on
-        // just return any integer to avoid any latches
-        // hopefully this error is caught by simulation
-        return INT8;
-      end
+      default: return 8;  // invalid format; avoid $fatal so constant-function use is valid
     endcase
   endfunction
 
@@ -352,13 +347,13 @@ package fpnew_pkg;
   // -------------------------------------------
   // Helper functions for INT formats and values
   // -------------------------------------------
-  // Returns the widest INT format present
+  // Returns the widest INT format present (unrolled for constant-function use in Icarus/sv2v)
   function automatic int unsigned max_int_width(ifmt_logic_t cfg);
-    automatic int unsigned res = 0;
-    for (int ifmt = 0; ifmt < NUM_INT_FORMATS; ifmt++) begin
-      if (cfg[ifmt]) res = maximum(res, int_width(int_format_e'(ifmt)));
-    end
-    return res;
+    automatic int unsigned w0 = cfg[0] ? 8 : 0;
+    automatic int unsigned w1 = cfg[1] ? 16 : 0;
+    automatic int unsigned w2 = cfg[2] ? 32 : 0;
+    automatic int unsigned w3 = cfg[3] ? 64 : 0;
+    return maximum(maximum(maximum(w0, w1), w2), w3);
   endfunction
 
   // --------------------------------------------------

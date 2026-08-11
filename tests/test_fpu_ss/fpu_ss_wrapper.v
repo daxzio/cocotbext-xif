@@ -10824,7 +10824,7 @@ module fpu_ss_wrapper (
 	localparam [21:0] sv2v_uu_fpu_ss_i_ext_x_compressed_req_i_0 = 1'sb0;
 	fpu_ss #(
 		.PULP_ZFINX(1),
-		.INPUT_BUFFER_DEPTH(0),
+		.INPUT_BUFFER_DEPTH(2),
 		.OUT_OF_ORDER(1),
 		.FORWARDING(1),
 		.PulpDivsqrt(1'b1)

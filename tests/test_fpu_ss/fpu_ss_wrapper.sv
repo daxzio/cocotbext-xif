@@ -144,7 +144,7 @@ module fpu_ss_wrapper (
   // ----------
   fpu_ss #(
     .PULP_ZFINX         (1),
-    .INPUT_BUFFER_DEPTH  (0),
+    .INPUT_BUFFER_DEPTH  (2),  // Min 2 for CV-X-IF: depth 1 causes deadlock (x_issue_ready stays 0 when FIFO full)
     .OUT_OF_ORDER        (1),
     .FORWARDING          (1),
     .PulpDivsqrt         (1'b1)

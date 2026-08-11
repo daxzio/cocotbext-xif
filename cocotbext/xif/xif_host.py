@@ -83,6 +83,8 @@ class XifHost(XifBase):
         self.bus.issue_req_id.value = 0
         self.bus.issue_req_rs_0.value = 0
         self.bus.issue_req_rs_1.value = 0
+        if hasattr(self.bus, "issue_req_rs_2"):
+            self.bus.issue_req_rs_2.value = 0
         self.bus.issue_req_rs_valid.value = 0
         # self.bus.issue_req_ecs.value = 0
         # self.bus.issue_req_ecs_valid.value = 0
@@ -138,53 +140,66 @@ class XifHost(XifBase):
         self.bus.commit_id.value = 0
         self.bus.commit_kill.value = 0
 
-    async def result(self, id: int, expected_val: int=-1):
+    async def result(self, id: int, expected_val: int = -1, check_we: bool = True):
         # Wait for result
         timeout = 0
         while int(self.bus.result_valid.value) != 1 and timeout < self.timeout_max:
             await RisingEdge(self.clock)
             timeout += 1
-        
+
         if timeout >= self.timeout_max:
             raise Exception("Timeout waiting for result")
 
         # Check result
         result_id = int(self.bus.result_id.value)
-        result_data = int(self.bus.result_data.value)
+        result_data = int(self.bus.result_data.value) & 0xFFFFFFFF
         result_we = int(self.bus.result_we.value)
 
-        # self.log.debug(f"Result ID: {result_id}, WE: {result_we}")
         self.log.debug(f"Result: 0x{result_data:08X}")
-        # self.log.debug(f"Expected: 0x{expected_val:08X}")
-
-        self.log.debug(f"Calculated: 0x{expected_val:08X}")
+        if expected_val != -1:
+            expected_u32 = expected_val & 0xFFFFFFFF
+            self.log.debug(f"Expected: 0x{expected_u32:08X}")
         if result_id != id:
             raise Exception(f"Result ID mismatch: got {result_id}, expected {id}")
-        if expected_val != -1 and result_data != expected_val:
-            raise Exception(f"Result data mismatch: got 0x{result_data:08X}, expected 0x{expected_val:08X}")
-        if result_we != 1:
+        if expected_val != -1 and result_data != (expected_val & 0xFFFFFFFF):
+            raise Exception(
+                f"Result data mismatch: got 0x{result_data:08X}, "
+                f"expected 0x{expected_val & 0xFFFFFFFF:08X}"
+            )
+        if check_we and result_we != 1:
             raise Exception("Write enable not set")
 
     
-    async def write_xx(
+    def _rs_valid_value(self, rs_valid: int | None) -> int:
+        if rs_valid is not None:
+            return rs_valid
+        width = len(self.bus.issue_req_rs_valid)
+        return (1 << width) - 1
+
+    async def exec(
         self,
         rs0: int = 0,
         rs1: int = 0,
+        rs2: int = 0,
+        rs_valid: int | None = None,
         expected_val: int = -1,
         mode: XifMode = XifMode.MMODE,
+        check_result_we: bool = True,
     ):
         x = self.calc_result(rs0, rs1, expected_val)
         id = self.tx_id
 
         instr = self.calc_instr()
         mode = XifMode.MMODE
-        self.bus.issue_valid.value = 1        
+        self.bus.issue_valid.value = 1
         self.bus.issue_req_instr.value = instr
         self.bus.issue_req_mode.value = mode
         self.bus.issue_req_id.value = id
-        self.bus.issue_req_rs_0.value = rs0
-        self.bus.issue_req_rs_1.value = rs1
-        self.bus.issue_req_rs_valid.value = 1
+        self.bus.issue_req_rs_0.value = rs0 & 0xFFFFFFFF
+        self.bus.issue_req_rs_1.value = rs1 & 0xFFFFFFFF
+        if hasattr(self.bus, "issue_req_rs_2"):
+            self.bus.issue_req_rs_2.value = rs2 & 0xFFFFFFFF
+        self.bus.issue_req_rs_valid.value = self._rs_valid_value(rs_valid)
         start_soon(self.commit(id, wait_cycle=1))
 
         await ReadOnly()
@@ -211,25 +226,82 @@ class XifHost(XifBase):
         self.bus.issue_req_id.value = 0
         self.bus.issue_req_rs_0.value = 0
         self.bus.issue_req_rs_1.value = 0
+        if hasattr(self.bus, "issue_req_rs_2"):
+            self.bus.issue_req_rs_2.value = 0
         self.bus.issue_req_rs_valid.value = 0
-        # self.bus.issue_req_ecs.value = 0
-        # self.bus.issue_req_ecs_valid.value = 0
-        
+
         if not accepted:
             raise Exception("Instruction not accepted!")
         if not comb_accept:
             self.log.warning("Instruction not accepted (combinatorial)")
-        # if int(self.bus.mem_req_id.value) != id:
-        #     raise Exception(f"mem_req_id mismatch: got {int(self.bus.mem_req_id.value)}, expected {id}")
-        # if int(self.bus.mem_req_mode.value) != mode:
-        #     raise Exception(f"mem_req_mode mismatch: got {int(self.bus.mem_req_mode.value)}, expected {mode}")
         self.log.debug("Instruction accepted")
-        
+
         self.tx_id = (id + 1) & self.id_mask
-        # # Acknowledge result
-        start_soon(self.result(id, expected_val=x))
+        if expected_val != -1 or check_result_we:
+            start_soon(self.result(id, expected_val=x, check_we=check_result_we))
         await RisingEdge(self.clock)
         await RisingEdge(self.clock)
+
+    async def exec_insn(
+        self,
+        instr: int,
+        rs0: int = 0,
+        rs1: int = 0,
+        rs2: int = 0,
+        rs_valid: int | None = None,
+        expected_val: int = -1,
+        mode: XifMode = XifMode.MMODE,
+        check_result_we: bool = True,
+        wait_ready_after: bool = False,
+    ):
+        """Issue a custom instruction and optionally wait for result / coprocessor ready."""
+        tx_id = self.tx_id
+        self.bus.issue_valid.value = 1
+        self.bus.issue_req_instr.value = instr & 0xFFFFFFFF
+        self.bus.issue_req_mode.value = mode
+        self.bus.issue_req_id.value = tx_id
+        self.bus.issue_req_rs_0.value = rs0 & 0xFFFFFFFF
+        self.bus.issue_req_rs_1.value = rs1 & 0xFFFFFFFF
+        if hasattr(self.bus, "issue_req_rs_2"):
+            self.bus.issue_req_rs_2.value = rs2 & 0xFFFFFFFF
+        self.bus.issue_req_rs_valid.value = self._rs_valid_value(rs_valid)
+        start_soon(self.commit(tx_id, wait_cycle=1))
+
+        await ReadOnly()
+        comb_accept = int(self.bus.issue_resp_accept.value)
+        await RisingEdge(self.clock)
+        timeout = 0
+        while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
+            await RisingEdge(self.clock)
+            timeout += 1
+
+        accepted = int(self.bus.issue_resp_accept.value)
+        self.bus.issue_valid.value = 0
+        self.bus.issue_req_instr.value = 0
+        self.bus.issue_req_id.value = 0
+        self.bus.issue_req_rs_0.value = 0
+        self.bus.issue_req_rs_1.value = 0
+        if hasattr(self.bus, "issue_req_rs_2"):
+            self.bus.issue_req_rs_2.value = 0
+        self.bus.issue_req_rs_valid.value = 0
+
+        if not accepted:
+            raise Exception(f"Instruction 0x{instr:08x} not accepted")
+        if not comb_accept:
+            self.log.warning("Instruction not accepted (combinatorial)")
+
+        self.tx_id = (tx_id + 1) & self.id_mask
+
+        if expected_val != -1 or check_result_we:
+            await self.result(tx_id, expected_val=expected_val, check_we=check_result_we)
+
+        if wait_ready_after:
+            timeout = 0
+            while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
+                await RisingEdge(self.clock)
+                timeout += 1
+            if timeout >= self.timeout_max:
+                raise Exception("Timeout waiting for issue_ready after multi-cycle op")
 
 
     # async def write(

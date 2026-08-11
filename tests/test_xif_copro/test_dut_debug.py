@@ -28,6 +28,11 @@ class BitrevXifMaster(XifMaster):
         instr |= 0x02 << 25          # funct7 [31:25] = 0000010
         return instr
 
+    def calc_result(self, rs0: int, rs1: int, expected_val: int=-1) -> int:
+        if expected_val != -1:
+            return expected_val
+        return int(f"{rs0:032b}"[::-1], 2)
+        
 @cocotb.test()
 async def test_bitrev_multiplex(dut):
     """Test multiple bit reversals"""
@@ -41,7 +46,8 @@ async def test_bitrev_multiplex(dut):
     xif_bus = XifBus.from_prefix(dut, "s_xif")
     xif_monitor = XifMonitor(xif_bus, dut.clk_i)
     xif_driver = BitrevXifMaster(xif_bus, dut.clk_i)
-    xif_monitor.enable_logging()
+    #xif_monitor.enable_logging()
+    xif_driver.enable_logging()
     # await xif_monitor.run()
     
     # Hold reset for 10 cycles
@@ -55,8 +61,9 @@ async def test_bitrev_multiplex(dut):
     for _ in range(5):
         await RisingEdge(dut.clk_i)
     
-    await xif_driver.write_xx(0xDEADBEEF, expected_val=0xF77DB57B)
-    await xif_driver.write_xx(0x12345678, expected_val=0x1E6A2C48)
+    await xif_driver.exec(0xDEADBEEF, expected_val=0xF77DB57B)
+    await xif_driver.exec(0x12345678, expected_val=0x1E6A2C48)
+    await xif_driver.exec(0x64563415)
     
     # Wait a bit before ending
     for _ in range(10):

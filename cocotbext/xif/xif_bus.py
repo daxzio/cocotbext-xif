@@ -10,6 +10,7 @@ class XifBus(Bus):
         "issue_req_id",
         "issue_req_rs_0",
         "issue_req_rs_1",
+        "issue_req_rs_2",
         "issue_req_rs_valid",
         "issue_resp_accept",
         "issue_resp_writeback",
