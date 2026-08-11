@@ -22,72 +22,81 @@ THE SOFTWARE.
 
 """
 
-import re
-import logging
-import math
-
-from cocotb import start_soon
-from cocotb.triggers import RisingEdge, FallingEdge, ReadOnly
+from __future__ import annotations
 
 from collections import deque
-from cocotb.triggers import Event
-from typing import Deque
-from typing import Tuple
-from typing import Any
-from typing import Union
-from typing import Dict
+from typing import Any, Deque, Dict, Optional, Sequence, Union
 
-from .xif_base import XifBase
-#rom .constants import XifProt
+from cocotb import start_soon
+from cocotb.triggers import Event, ReadOnly, RisingEdge
+
 from .constants import XifMode
-from .utils import resolve_x_int
+from .memory import Memory
+from .transaction import IdAllocator, XifInsn, XifMemReq, XifResult
+from .xif_base import XifBase
 
-# def build_bitrev_instr(rd, rs1):
-#     """Build a BITREV instruction
-#     Format: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
-#     BITREV: 0000010 | 00000 | rs1 | 111 | rd | 0101011
-#     """
-#     instr = 0
-#     instr |= 0x2B                # opcode [6:0] = 0101011
-#     instr |= (rd & 0x1F) << 7    # rd [11:7]
-#     instr |= 0x7 << 12           # funct3 [14:12] = 111
-#     instr |= (rs1 & 0x1F) << 15  # rs1 [19:15]
-#     instr |= 0x0 << 20           # rs2 [24:20] = 00000 (unused)
-#     instr |= 0x02 << 25          # funct7 [31:25] = 0000010
-#     return instr
 
 class XifHost(XifBase):
-    def __init__(self, bus, clock, timeout_max=100, **kwargs) -> None:
-        super().__init__(bus, clock, name="host", **kwargs)
+    """CPU-side XIF driver: issue, commit, result, and memory channels."""
+
+    def __init__(
+        self,
+        bus,
+        clock,
+        reset=None,
+        reset_active_level: bool = False,
+        timeout_max: int = 100,
+        mem: Optional[Memory] = None,
+        commit_delay: int = 1,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            bus,
+            clock,
+            name="host",
+            reset=reset,
+            reset_active_level=reset_active_level,
+            **kwargs,
+        )
 
         self.timeout_max = timeout_max
-        # self.exception_enabled = True
-        # self.exception_occurred = False
+        self.mem = mem
+        self.commit_delay = commit_delay
 
-        # self.queue_tx: Deque[
-        #     Tuple[bool, int, bytes, int, XifProt, bool, int, int]
-        # ] = deque()
-        #self.queue_rx: Deque[Tuple[bytes, int]] = deque()
-        self.tx_id = 1
-        self.return_int = False
-        self.ret: Union[bytes, None] = None
-        self.intra_delay: int = 0
-        self.addrmap: Dict[int, Dict[str, int]] = {}
-
+        self._ids = IdAllocator(self.id_width)
+        self._issue_queue: Deque[XifInsn] = deque()
+        self._pending: Dict[int, XifInsn] = {}
+        self._result_events: Dict[int, Event] = {}
+        self._results: Dict[int, XifResult] = {}
         self._idle = Event()
+        self._idle.set()
+        self._issue_busy = False
 
+        self._init_host_signals()
+
+        self._issue_coroutine: Any = start_soon(self._run_issue())
+        self._result_coroutine: Any = start_soon(self._run_result())
+        if self.mem is not None:
+            self._mem_coroutine: Any = start_soon(self._run_mem())
+        else:
+            self._mem_coroutine = None
+
+    def _init_host_signals(self) -> None:
         self.bus.issue_valid.value = 0
-        # self.bus.issue_ready.value = 1
         self.bus.issue_req_instr.value = 0
         self.bus.issue_req_mode.value = 0
         self.bus.issue_req_id.value = 0
         self.bus.issue_req_rs_0.value = 0
         self.bus.issue_req_rs_1.value = 0
-        if hasattr(self.bus, "issue_req_rs_2"):
+        if self.bus.has_rs_2:
             self.bus.issue_req_rs_2.value = 0
         self.bus.issue_req_rs_valid.value = 0
-        # self.bus.issue_req_ecs.value = 0
-        # self.bus.issue_req_ecs_valid.value = 0
+
+        self.bus.commit_valid.value = 0
+        self.bus.commit_id.value = 0
+        self.bus.commit_kill.value = 0
+
+        self.bus.result_ready.value = 1
 
         self.bus.mem_ready.value = 1
         self.bus.mem_resp_exc.value = 0
@@ -97,481 +106,311 @@ class XifHost(XifBase):
         self.bus.mem_result_rdata.value = 0
         self.bus.mem_result_err.value = 0
 
-        self.bus.commit_valid.value = 0
-        self.bus.commit_id.value = 0
-        self.bus.commit_kill.value = 0
-        self.bus.result_id.value = 0
-        self.bus.result_ready.value = 1
-        
+    @property
+    def idle(self) -> bool:
+        return not self._issue_queue and not self._pending and not self._issue_busy
 
-        # self.bus.mem_resp_dbg.value = 0
-        # self.bus.mem_result_dbg.value = 0
-        # self.bus.compressed_valid.value = 0
-        # self.bus.compressed_req.value = 0
+    async def wait_idle(self) -> None:
+        while not self.idle:
+            await RisingEdge(self.clock)
 
-        # self._run_coroutine_obj: Any = None
-        # self._restart()
+    def issue_nowait(self, insn: XifInsn) -> XifInsn:
+        """Queue an instruction for issue. Returns the same object with ``id`` set."""
+        insn.id = self._ids.alloc()
+        self._issue_queue.append(insn)
+        self._result_events[insn.id] = Event()
+        self._idle.clear()
+        return insn
 
-    def calc_instr(self, rd, rs1):
-        """Build a BITREV instruction
-        Format: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
-        BITREV: 0000010 | 00000 | rs1 | 111 | rd | 0101011
-        """
-        instr = 0
-        instr |= 0x2B                # opcode [6:0] = 0101011
-        instr |= (rd & 0x1F) << 7    # rd [11:7]
-        instr |= 0x7 << 12           # funct3 [14:12] = 111
-        instr |= (rs1 & 0x1F) << 15  # rs1 [19:15]
-        instr |= 0x0 << 20           # rs2 [24:20] = 00000 (unused)
-        instr |= 0x02 << 25          # funct7 [31:25] = 0000010
-        return instr
+    async def wait(
+        self,
+        insn: XifInsn,
+        *,
+        wait_result: bool = True,
+        wait_ready_after: bool = False,
+    ) -> XifResult | None:
+        """Wait for the result of a previously issued instruction."""
+        if wait_result:
+            event = self._result_events.get(insn.id)
+            if event is None:
+                raise KeyError(f"No outstanding instruction with id {insn.id}")
 
-    def calc_result(self, rs0: int, rs1: int, expected_val: int=-1) -> int:
-        return expected_val
-        
-    async def commit(self, id: int, wait_cycle: int = 1, kill: int = 0):
-        for i in range(wait_cycle):
+            timeout = 0
+            while not event.is_set() and timeout < self.timeout_max:
+                await RisingEdge(self.clock)
+                timeout += 1
+            if timeout >= self.timeout_max:
+                raise TimeoutError(
+                    f"Timeout waiting for result id {insn.id} "
+                    f"within {self.timeout_max} cycles"
+                )
+
+            result = self._results[insn.id]
+            self._check_result(insn, result)
+        else:
+            result = None
+
+        if wait_ready_after:
+            await self._wait_issue_ready()
+
+        return result
+
+    async def _wait_issue_ready(self) -> None:
+        timeout = 0
+        while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
+            await RisingEdge(self.clock)
+            timeout += 1
+        if timeout >= self.timeout_max:
+            raise TimeoutError(
+                "Timeout waiting for issue_ready after multi-cycle operation"
+            )
+
+    async def execute(
+        self,
+        instr: int,
+        rs: Sequence[int] = (0, 0, 0),
+        rs_valid: int | None = None,
+        mode: XifMode = XifMode.MMODE,
+        expected: int | None = None,
+        check_we: bool = True,
+        commit: bool = True,
+        kill: int = 0,
+        wait_ready_after: bool = False,
+        wait_result: bool | None = None,
+    ) -> XifResult | None:
+        """Issue one instruction, optionally commit, and wait for the result."""
+        if wait_result is None:
+            wait_result = expected is not None or check_we
+
+        txn = XifInsn(
+            instr=instr,
+            rs=self.normalize_rs(rs),
+            rs_valid=rs_valid,
+            mode=mode,
+            expected=expected,
+            check_we=check_we,
+        )
+        self.issue_nowait(txn)
+        await self._wait_accepted(txn)
+        if commit:
+            await self.commit(txn.id, wait_cycle=self.commit_delay, kill=kill)
+        return await self.wait(
+            txn, wait_result=wait_result, wait_ready_after=wait_ready_after
+        )
+
+    async def _wait_accepted(self, insn: XifInsn) -> None:
+        timeout = 0
+        while not insn.accepted and timeout < self.timeout_max:
+            await RisingEdge(self.clock)
+            timeout += 1
+        if not insn.accepted:
+            raise TimeoutError(
+                f"Timeout waiting for issue accept on id {insn.id} "
+                f"within {self.timeout_max} cycles"
+            )
+
+    async def commit(self, txn_id: int, wait_cycle: int = 1, kill: int = 0) -> None:
+        """Drive the commit channel for a previously accepted instruction."""
+        for _ in range(wait_cycle):
             await RisingEdge(self.clock)
         self.bus.commit_valid.value = 1
-        self.bus.commit_id.value = id
+        self.bus.commit_id.value = txn_id
         self.bus.commit_kill.value = kill
         await RisingEdge(self.clock)
         self.bus.commit_valid.value = 0
         self.bus.commit_id.value = 0
         self.bus.commit_kill.value = 0
+        if txn_id in self._pending:
+            self._pending[txn_id].committed = True
 
-    async def result(self, id: int, expected_val: int = -1, check_we: bool = True):
-        # Wait for result
-        timeout = 0
-        while int(self.bus.result_valid.value) != 1 and timeout < self.timeout_max:
-            await RisingEdge(self.clock)
-            timeout += 1
-
-        if timeout >= self.timeout_max:
-            raise Exception("Timeout waiting for result")
-
-        # Check result
-        result_id = int(self.bus.result_id.value)
-        result_data = int(self.bus.result_data.value) & 0xFFFFFFFF
-        result_we = int(self.bus.result_we.value)
-
-        self.log.debug(f"Result: 0x{result_data:08X}")
-        if expected_val != -1:
-            expected_u32 = expected_val & 0xFFFFFFFF
-            self.log.debug(f"Expected: 0x{expected_u32:08X}")
-        if result_id != id:
-            raise Exception(f"Result ID mismatch: got {result_id}, expected {id}")
-        if expected_val != -1 and result_data != (expected_val & 0xFFFFFFFF):
-            raise Exception(
-                f"Result data mismatch: got 0x{result_data:08X}, "
-                f"expected 0x{expected_val & 0xFFFFFFFF:08X}"
-            )
-        if check_we and result_we != 1:
-            raise Exception("Write enable not set")
-
-    
-    def _rs_valid_value(self, rs_valid: int | None) -> int:
-        if rs_valid is not None:
-            return rs_valid
-        width = len(self.bus.issue_req_rs_valid)
-        return (1 << width) - 1
-
-    async def exec(
-        self,
-        rs0: int = 0,
-        rs1: int = 0,
-        rs2: int = 0,
-        rs_valid: int | None = None,
-        expected_val: int = -1,
-        mode: XifMode = XifMode.MMODE,
-        check_result_we: bool = True,
-    ):
-        x = self.calc_result(rs0, rs1, expected_val)
-        id = self.tx_id
-
-        instr = self.calc_instr()
-        mode = XifMode.MMODE
-        self.bus.issue_valid.value = 1
-        self.bus.issue_req_instr.value = instr
-        self.bus.issue_req_mode.value = mode
-        self.bus.issue_req_id.value = id
-        self.bus.issue_req_rs_0.value = rs0 & 0xFFFFFFFF
-        self.bus.issue_req_rs_1.value = rs1 & 0xFFFFFFFF
-        if hasattr(self.bus, "issue_req_rs_2"):
-            self.bus.issue_req_rs_2.value = rs2 & 0xFFFFFFFF
-        self.bus.issue_req_rs_valid.value = self._rs_valid_value(rs_valid)
-        start_soon(self.commit(id, wait_cycle=1))
-
-        await ReadOnly()
-        comb_accept = int(self.bus.issue_resp_accept.value)
-        # if comb_accept:
-        #     if int(self.bus.mem_req_id.value) != id:
-        #         raise Exception(f"Combinatorial mem_req_id mismatch: got {int(self.bus.mem_req_id.value)}, expected {id}")
-        #     if int(self.bus.issue_req_mode.value) != mode:
-        #         raise Exception(f"Combinatorial issue_req_mode mismatch: got {int(self.bus.issue_req_mode.value)}, expected {XifMode.MMODE}")
-        #comb_mem_req_id = int(self.bus.mem_req_id.value)
-        #self.log.info(f"Combinatorial issue_resp_accept {int(self.bus.issue_resp_accept.value)}")
-        await RisingEdge(self.clock)
-        timeout = 0
-        while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
-            await RisingEdge(self.clock)
-            timeout += 1
-        
-        # Capture if accepted
-        accepted = int(self.bus.issue_resp_accept.value)
-        
+    def _clear_issue_req(self) -> None:
         self.bus.issue_valid.value = 0
         self.bus.issue_req_instr.value = 0
-        self.bus.issue_req_mode.value = mode
+        self.bus.issue_req_mode.value = 0
         self.bus.issue_req_id.value = 0
         self.bus.issue_req_rs_0.value = 0
         self.bus.issue_req_rs_1.value = 0
-        if hasattr(self.bus, "issue_req_rs_2"):
+        if self.bus.has_rs_2:
             self.bus.issue_req_rs_2.value = 0
         self.bus.issue_req_rs_valid.value = 0
 
-        if not accepted:
-            raise Exception("Instruction not accepted!")
-        if not comb_accept:
-            self.log.warning("Instruction not accepted (combinatorial)")
-        self.log.debug("Instruction accepted")
-
-        self.tx_id = (id + 1) & self.id_mask
-        if expected_val != -1 or check_result_we:
-            start_soon(self.result(id, expected_val=x, check_we=check_result_we))
-        await RisingEdge(self.clock)
-        await RisingEdge(self.clock)
-
-    async def exec_insn(
-        self,
-        instr: int,
-        rs0: int = 0,
-        rs1: int = 0,
-        rs2: int = 0,
-        rs_valid: int | None = None,
-        expected_val: int = -1,
-        mode: XifMode = XifMode.MMODE,
-        check_result_we: bool = True,
-        wait_ready_after: bool = False,
-    ):
-        """Issue a custom instruction and optionally wait for result / coprocessor ready."""
-        tx_id = self.tx_id
+    def _drive_issue_req(self, insn: XifInsn) -> None:
+        rs = self.normalize_rs(insn.rs)
         self.bus.issue_valid.value = 1
-        self.bus.issue_req_instr.value = instr & 0xFFFFFFFF
-        self.bus.issue_req_mode.value = mode
-        self.bus.issue_req_id.value = tx_id
-        self.bus.issue_req_rs_0.value = rs0 & 0xFFFFFFFF
-        self.bus.issue_req_rs_1.value = rs1 & 0xFFFFFFFF
-        if hasattr(self.bus, "issue_req_rs_2"):
-            self.bus.issue_req_rs_2.value = rs2 & 0xFFFFFFFF
-        self.bus.issue_req_rs_valid.value = self._rs_valid_value(rs_valid)
-        start_soon(self.commit(tx_id, wait_cycle=1))
+        self.bus.issue_req_instr.value = self.mask_x(insn.instr)
+        self.bus.issue_req_mode.value = int(insn.mode)
+        self.bus.issue_req_id.value = insn.id
+        self.bus.issue_req_rs_0.value = rs[0]
+        self.bus.issue_req_rs_1.value = rs[1]
+        if self.bus.has_rs_2:
+            self.bus.issue_req_rs_2.value = rs[2] if len(rs) > 2 else 0
+        self.bus.issue_req_rs_valid.value = self.default_rs_valid(insn.rs_valid)
 
-        await ReadOnly()
-        comb_accept = int(self.bus.issue_resp_accept.value)
-        await RisingEdge(self.clock)
-        timeout = 0
-        while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
+    async def _run_issue(self) -> None:
+        await self._wait_reset_release()
+        while True:
+            if not self._issue_queue:
+                self._issue_busy = False
+                if not self._pending:
+                    self._idle.set()
+                await RisingEdge(self.clock)
+                continue
+
+            self._issue_busy = True
+            insn = self._issue_queue.popleft()
+
+            self._drive_issue_req(insn)
+            await ReadOnly()
+            comb_accept = int(self.bus.issue_resp_accept.value)
             await RisingEdge(self.clock)
-            timeout += 1
 
-        accepted = int(self.bus.issue_resp_accept.value)
-        self.bus.issue_valid.value = 0
-        self.bus.issue_req_instr.value = 0
-        self.bus.issue_req_id.value = 0
-        self.bus.issue_req_rs_0.value = 0
-        self.bus.issue_req_rs_1.value = 0
-        if hasattr(self.bus, "issue_req_rs_2"):
-            self.bus.issue_req_rs_2.value = 0
-        self.bus.issue_req_rs_valid.value = 0
-
-        if not accepted:
-            raise Exception(f"Instruction 0x{instr:08x} not accepted")
-        if not comb_accept:
-            self.log.warning("Instruction not accepted (combinatorial)")
-
-        self.tx_id = (tx_id + 1) & self.id_mask
-
-        if expected_val != -1 or check_result_we:
-            await self.result(tx_id, expected_val=expected_val, check_we=check_result_we)
-
-        if wait_ready_after:
             timeout = 0
             while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
                 await RisingEdge(self.clock)
                 timeout += 1
             if timeout >= self.timeout_max:
-                raise Exception("Timeout waiting for issue_ready after multi-cycle op")
+                self._clear_issue_req()
+                raise TimeoutError(
+                    f"Timeout waiting for issue_ready during id {insn.id}"
+                )
 
+            accepted = int(self.bus.issue_resp_accept.value)
+            self._clear_issue_req()
 
-    # async def write(
-    #     self,
-    #     addr: int,
-    #     data: Union[int, bytes],
-    #     strb: int = -1,
-    #     prot: XifProt = XifProt.NONSECURE,
-    #     error_expected: bool = False,
-    #     device: int = 0,
-    #     length: int = -1,
-    #     index: int = -1,
-    # ) -> None:
-    #     self.write_nowait(addr, data, strb, prot, error_expected, device, length, index)
-    #     await self._idle.wait()
-    #     for i in range(self.intra_delay):
-    #         await RisingEdge(self.clock)
+            if not accepted:
+                self._ids.release(insn.id)
+                self._result_events.pop(insn.id, None)
+                raise RuntimeError(
+                    f"Instruction 0x{insn.instr:08x} (id {insn.id}) not accepted"
+                )
+            if not comb_accept:
+                self.log.warning(
+                    "Instruction 0x%08x (id %d) not accepted combinatorially",
+                    insn.instr,
+                    insn.id,
+                )
 
-    # def write_nowait(
-    #     self,
-    #     addr: int,
-    #     data: Union[int, bytes],
-    #     strb: int = -1,
-    #     prot: XifProt = XifProt.NONSECURE,
-    #     error_expected: bool = False,
-    #     device: int = 0,
-    #     length: int = -1,
-    #     index: int = -1,
-    # ) -> None:
-    #     """ """
-    #     self._idle.clear()
-    #     self.addr = self.calc_address(addr, device, index)
-    #     self.loop = self.calc_length(length, data)
-    #     for i in range(self.loop):
-    #         addrb = self.addr + i * self.wbytes
-    #         if isinstance(data, int):
-    #             subdata = (data >> self.wwidth * i) & self.wdata_mask
-    #             datab = subdata.to_bytes(self.wbytes, "little")
-    #         else:
-    #             datab = data[i * self.wbytes : (i + 1) * self.wbytes]
-    #         self.tx_id += 1
-    #         self.queue_tx.append(
-    #             (True, addrb, datab, strb, prot, error_expected, device, self.tx_id)
-    #         )
+            insn.accepted = True
+            self._pending[insn.id] = insn
+            self.log.debug(
+                "Instruction 0x%08x accepted (id %d)", insn.instr, insn.id
+            )
 
-    # async def poll(
-    #     self,
-    #     addr: int,
-    #     data: Union[int, bytes] = bytes(),
-    #     device: int = 0,
-    #     index: int = -1,
-    # ) -> None:
-    #     self.addr = self.calc_address(addr, device, index)
-    #     self.log.info(f"Poll  0x{self.addr:08x}")
-    #     level_num = self.log.getEffectiveLevel()
-    #     self.log.setLevel(logging.WARNING)
-    #     if isinstance(data, int):
-    #         datab = data.to_bytes(self.rbytes[device], "little")
-    #     else:
-    #         datab = data
-    #     self.ret = None
-    #     while not self.ret == datab:
-    #         await self.read(addr, device=device)
-    #     self.log.setLevel(level_num)
+    async def _run_result(self) -> None:
+        await self._wait_reset_release()
+        while True:
+            await RisingEdge(self.clock)
+            if int(self.bus.result_valid.value) != 1:
+                continue
+            if int(self.bus.result_ready.value) != 1:
+                continue
 
-    # async def read(
-    #     self,
-    #     addr: int,
-    #     data: Union[int, bytes] = bytes(),
-    #     prot: XifProt = XifProt.NONSECURE,
-    #     error_expected: bool = False,
-    #     device: int = 0,
-    #     index: int = -1,
-    #     length: int = -1,
-    # ) -> Union[bytes, int]:
-    #     rx_id = self.read_nowait(
-    #         addr, data, prot, error_expected, device, index, length
-    #     )
-    #     found = False
-    #     while not found:
-    #         while self.queue_rx:
-    #             ret, tx_id = self.queue_rx.popleft()
-    #             if rx_id == tx_id:
-    #                 found = True
-    #                 break
-    #         await self._idle.wait()
-    #     for i in range(self.intra_delay):
-    #         await RisingEdge(self.clock)
-    #     self.ret = ret
-    #     if self.return_int:
-    #         return int.from_bytes(ret, byteorder="little")
-    #     else:
-    #         return ret
+            txn_id = int(self.bus.result_id.value)
+            result = XifResult(
+                id=txn_id,
+                data=self.mask_x(int(self.bus.result_data.value)),
+                rd=int(self.bus.result_rd.value),
+                we=bool(int(self.bus.result_we.value)),
+                exc=bool(int(self.bus.result_exc.value)),
+                exccode=int(self.bus.result_exccode.value),
+            )
 
-    # def read_nowait(
-    #     self,
-    #     addr: int,
-    #     data: Union[int, bytes] = bytes(),
-    #     prot: XifProt = XifProt.NONSECURE,
-    #     error_expected: bool = False,
-    #     device: int = 0,
-    #     index: int = -1,
-    #     length: int = -1,
-    # ) -> int:
-    #     self._idle.clear()
-    #     self.addr = self.calc_address(addr, device, index)
-    #     self.loop = self.calc_length(length, data)
-    #     for i in range(self.loop):
-    #         addrb = self.addr + i * self.rbytes[device]
-    #         if isinstance(data, int):
-    #             subdata = (data >> self.rwidth[device] * i) & self.rdata_mask[device]
-    #             datab = subdata.to_bytes(self.rbytes[device], "little")
-    #         else:
-    #             datab = data
-    #         self.tx_id += 1
-    #         self.queue_tx.append(
-    #             (False, addrb, datab, -1, prot, error_expected, device, self.tx_id)
-    #         )
-    #     return self.tx_id
+            self._results[txn_id] = result
+            event = self._result_events.get(txn_id)
+            if event is not None:
+                event.set()
 
-    def _restart(self) -> None:
-        if self._run_coroutine_obj is not None:
-            self._run_coroutine_obj.kill()
-        self._run_coroutine_obj = start_soon(self._run())
+            self._pending.pop(txn_id, None)
+            self._ids.release(txn_id)
 
-    @property
-    def count_tx(self) -> int:
-        return len(self.queue_tx)
+            if not self._issue_queue and not self._pending and not self._issue_busy:
+                self._idle.set()
 
-    @property
-    def empty_tx(self) -> bool:
-        return not self.queue_tx
+    def _check_result(self, insn: XifInsn, result: XifResult) -> None:
+        if result.id != insn.id:
+            raise RuntimeError(
+                f"Result ID mismatch: got {result.id}, expected {insn.id}"
+            )
+        if insn.expected is not None:
+            expected = self.mask_x(insn.expected)
+            if result.data != expected:
+                raise RuntimeError(
+                    f"Result data mismatch for id {insn.id}: "
+                    f"got 0x{result.data:0{width}x}, expected 0x{expected:0{width}x}".format(
+                        width=max(1, self.xlen // 4)
+                    )
+                )
+        if insn.check_we and not result.we:
+            raise RuntimeError(f"Write enable not set for id {insn.id}")
 
-    @property
-    def count_rx(self) -> int:
-        return len(self.queue_rx)
+    async def _run_mem(self) -> None:
+        assert self.mem is not None
+        await self._wait_reset_release()
+        while True:
+            await RisingEdge(self.clock)
+            if int(self.bus.mem_valid.value) != 1:
+                continue
+            if int(self.bus.mem_ready.value) != 1:
+                continue
 
-    @property
-    def empty_rx(self) -> bool:
-        return not self.queue_rx
+            req = XifMemReq(
+                id=int(self.bus.mem_req_id.value),
+                addr=int(self.bus.mem_req_addr.value),
+                mode=XifMode(int(self.bus.mem_req_mode.value)),
+                we=bool(int(self.bus.mem_req_we.value)),
+                size=int(self.bus.mem_req_size.value),
+                be=int(self.bus.mem_req_be.value),
+                wdata=self.mask_x(int(self.bus.mem_req_wdata.value)),
+                last=bool(int(self.bus.mem_req_last.value)),
+            )
 
-    @property
-    def idle(self) -> bool:
-        return self.empty_tx and self.empty_rx
+            err = False
+            rdata = 0
+            try:
+                rdata = await self._handle_mem_req(req)
+            except Exception as exc:
+                self.log.warning(
+                    "Memory access failed id %d addr 0x%x: %s",
+                    req.id,
+                    req.addr,
+                    exc,
+                )
+                err = True
 
-    def clear(self) -> None:
-        """Clears the RX and TX queues"""
-        self.queue_tx.clear()
-        self.queue_rx.clear()
+            self.bus.mem_result_valid.value = 1
+            self.bus.mem_result_id.value = req.id
+            self.bus.mem_result_rdata.value = rdata & self.mem_data_mask
+            self.bus.mem_result_err.value = int(err)
+            await RisingEdge(self.clock)
+            self.bus.mem_result_valid.value = 0
+            self.bus.mem_result_id.value = 0
+            self.bus.mem_result_rdata.value = 0
+            self.bus.mem_result_err.value = 0
 
-    async def wait(self) -> None:
-        """Wait for idle"""
-        await self._idle.wait()
+    async def _handle_mem_req(self, req: XifMemReq) -> int:
+        assert self.mem is not None
+        size_bytes = max(1, 1 << req.size)
+        addr = req.addr
+        if req.we:
+            data = req.wdata.to_bytes(
+                (self.mem_data_width + 7) // 8, byteorder="little"
+            )
+            if self.mem_be_width:
+                for i in range(min(len(data), self.mem_be_width)):
+                    if (req.be >> i) & 1:
+                        self.mem.write_byte(addr + i, data[i])
+            else:
+                self.mem.write(addr, data[:size_bytes])
+            self.log.debug("Mem write id %d addr 0x%x", req.id, addr)
+            return 0
 
-    # async def _run(self):
-    #     while True:
-    #         if not self.queue_tx:
-    #             await RisingEdge(self.clock)
-    #         else:
-    #             (
-    #                 write,
-    #                 addr,
-    #                 data,
-    #                 strb,
-    #                 prot,
-    #                 error_expected,
-    #                 device,
-    #                 tx_id,
-    #             ) = self.queue_tx.popleft()
-
-    #             if addr < 0 or addr >= 2**self.address_width:
-    #                 raise ValueError("Address out of range")
-
-    #             if device > len(self.bus.psel) - 1:
-    #                 raise ValueError(
-    #                     f"Trying to access a device, {device}, that is not available on the bus {len(self.bus.psel)-1}"
-    #                 )
-
-    #             self.bus.psel.value = 1 << device
-    #             self.bus.paddr.value = addr
-    #             extra_text = ""
-    #             if self.pprot_present:
-    #                 self.bus.pprot.value = prot
-    #                 extra_text += f" prot: {prot}"
-    #             apb = ""
-    #             if self.multi_device:
-    #                 apb = f"({device}) "
-    #             if self.penable_present:
-    #                 self.bus.penable.value = 0
-    #             if write:
-    #                 data = int.from_bytes(data, byteorder="little")
-    #                 self.log.info(f"Write {apb}0x{addr:08x}: 0x{data:08x}{extra_text}")
-    #                 self.bus.pwdata.value = data & self.wdata_mask
-    #                 self.bus.pwrite.value = 1
-    #                 if self.pstrb_present:
-    #                     if -1 == strb:
-    #                         self.bus.pstrb.value = self.strb_mask
-    #                     else:
-    #                         self.bus.pstrb.value = strb
-
-    #             await RisingEdge(self.clock)
-    #             if self.penable_present:
-    #                 self.bus.penable.value = 1
-    #                 await FallingEdge(self.clock)
-    #             timeout = 0
-    #             while not self.bus.pready.value:
-    #                 await FallingEdge(self.clock)
-    #                 if self.timeout_max != -1:
-    #                     timeout += 1
-    #                     if timeout >= self.timeout_max:
-    #                         self.log.info(f"Read  {apb}0x{addr:08x}:{extra_text}")
-    #                         raise TimeoutError(
-    #                             f"XIF transaction timeout: pready not asserted within {self.timeout_max} clock cycles (addr: 0x{addr:08x})"
-    #                         )
-
-    #             if self.pslverr_present:
-    #                 if not bool(self.bus.pslverr.value) == error_expected:
-    #                     if bool(self.bus.pslverr.value):
-    #                         msg = "PSLVERR detected not expected!"
-    #                     else:
-    #                         msg = "PSLVERR expected not detected!"
-    #                     if self.pprot_present:
-    #                         msg += f" PPROT - {XifProt(self.bus.pprot.value).name}"
-    #                     self.exception_occurred = True
-    #                     if self.exception_enabled:
-    #                         self.log.critical(msg)
-    #                         raise Exception(msg)
-    #                     else:
-    #                         self.log.warning(msg)
-
-    #             if not write:
-    #                 ret = resolve_x_int(self.bus.prdata)
-    #                 ret_slice = (
-    #                     ret >> (device * self.rwidth[device])
-    #                 ) & self.rdata_mask[device]
-    #                 self.log.info(
-    #                     f"Read  {apb}0x{addr:08x}: 0x{ret_slice:08x}{extra_text}"
-    #                 )
-    #                 if not data == bytes():
-    #                     data_int = int.from_bytes(data, byteorder="little")
-    #                     if not data_int == ret_slice:
-    #                         self.bus.psel.value = 0
-    #                         await RisingEdge(self.clock)
-    #                         await RisingEdge(self.clock)
-    #                         await RisingEdge(self.clock)
-    #                         raise Exception(
-    #                             f"Expected 0x{data_int:08x} doesn't match returned 0x{ret_slice:08x}"
-    #                         )
-    #                 self.queue_rx.append(
-    #                     (ret_slice.to_bytes(self.rbytes[device], "little"), tx_id)
-    #                 )
-
-    #             if not self.queue_tx:
-    #                 self._idle.set()
-
-    #             await RisingEdge(self.clock)
-
-    #             if self.penable_present:
-    #                 self.bus.penable.value = 0
-    #             self.bus.psel.value = 0
-    #             self.bus.paddr.value = 0
-    #             if self.pprot_present:
-    #                 self.bus.pprot.value = 0
-    #             self.bus.pwrite.value = 0
-    #             self.bus.pwdata.value = 0
-    #             if self.pstrb_present:
-    #                 self.bus.pstrb.value = 0
-
-
-class XifMaster(XifHost):
-    """Deprecated alias for XifHost."""
-
-    pass
+        length = size_bytes
+        raw = self.mem.read(addr, length)
+        rdata = int.from_bytes(
+            raw.ljust((self.mem_data_width + 7) // 8, b"\x00"),
+            byteorder="little",
+        )
+        self.log.debug(
+            "Mem read id %d addr 0x%x -> 0x%x", req.id, addr, rdata
+        )
+        return rdata

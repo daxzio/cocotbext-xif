@@ -22,18 +22,29 @@ THE SOFTWARE.
 
 """
 
-import logging
 import datetime
-from random import randint, seed
+import logging
+from typing import Any
 
 from .version import __version__
 
 
 class XifBase:
-    def __init__(self, bus, clock, name="monitor", seednum=None) -> None:
+    def __init__(
+        self,
+        bus,
+        clock,
+        name: str = "monitor",
+        reset: Any = None,
+        reset_active_level: bool = False,
+        **kwargs,
+    ) -> None:
         self.name = name
         self.bus = bus
         self.clock = clock
+        self.reset = reset
+        self.reset_active_level = reset_active_level
+
         if bus._name:
             self.log = logging.getLogger(f"cocotb.xif_{name}.{bus._name}")
         else:
@@ -44,79 +55,68 @@ class XifBase:
         self.log.info(f"Copyright (c) 2024-{datetime.datetime.now().year} Daxzio")
         self.log.info("https://github.com/daxzio/cocotbext-xif")
 
-        # self.total_devices = len(self.bus.psel)
-        # self.multi_device = False
-        # if self.total_devices > 1:
-        #     self.multi_device = True
-        # self.byte_size = 8
-        # self.address_width = len(self.bus.paddr)
-        self.id_width = len(self.bus.issue_req_id)
-        # self.wbytes = int(self.wwidth / 8)
-        self.id_mask = 2**self.id_width - 1
-        # self.byte_lanes = self.wwidth // self.byte_size
-        # self.strb_mask = 2**self.byte_lanes - 1
-        # self.rwidth = []
-        # self.rbytes = []
-        # self.rdata_mask = []
-        # for i in range(self.total_devices):
-        #     self.rwidth.append(int(len(self.bus.prdata) / self.total_devices))
-        #     self.rbytes.append(int(self.rwidth[i] / 8))
-        #     self.rdata_mask.append(2 ** self.rwidth[i] - 1)
-
-        # self.penable_present = hasattr(self.bus, "penable")
-        # self.pstrb_present = hasattr(self.bus, "pstrb")
-        # self.pprot_present = hasattr(self.bus, "pprot")
-        # self.pslverr_present = hasattr(self.bus, "pslverr")
-        # if self.pstrb_present:
-        #     assert self.byte_lanes == len(self.bus.pstrb)
-        # assert self.byte_lanes * self.byte_size == self.wwidth
+        self.id_width = bus.id_width
+        self.id_mask = (1 << self.id_width) - 1 if self.id_width else 0
+        self.xlen = bus.xlen
+        self.x_mask = (1 << self.xlen) - 1 if self.xlen else 0
+        self.rs_count = bus.rs_count
+        self.rs_valid_width = bus.rs_valid_width
+        self.rs_valid_mask = (1 << self.rs_valid_width) - 1 if self.rs_valid_width else 0
+        self.mem_data_width = bus.mem_data_width
+        self.mem_data_mask = (1 << self.mem_data_width) - 1 if self.mem_data_width else 0
+        self.mem_be_width = bus.mem_be_width
+        self.mem_addr_width = bus.mem_addr_width
 
         self.log.info(f"XIF {self.name} configuration:")
-        # self.log.info(f"  Address width: {self.address_width} bits")
-        # self.log.info(f"  Byte size: {self.byte_size} bits")
-        # self.log.info(f"  Data width: {self.wwidth} bits ({self.byte_lanes} bytes)")
+        self.log.info(f"  XLEN: {self.xlen} bits")
+        self.log.info(f"  ID width: {self.id_width} bits")
+        self.log.info(f"  RS count: {self.rs_count}")
+        self.log.info(f"  Mem data width: {self.mem_data_width} bits")
 
         self.log.debug("XIF signals:")
         for sig in sorted(
             list(set().union(self.bus._signals, self.bus._optional_signals))
         ):
-            #print(sig)
+            if not hasattr(self.bus, sig):
+                self.log.debug(f"  {sig}: not present")
+                continue
+            handle = getattr(self.bus, sig)
+            if handle is None:
+                self.log.debug(f"  {sig}: not present")
+                continue
             try:
-                if hasattr(self.bus, sig):
-                    self.log.debug(f"  {sig} width: {len(getattr(self.bus, sig))} bits")
-                else:
-                    self.log.debug(f"  {sig}: not present")
+                self.log.debug(f"  {sig} width: {len(handle)} bits")
             except TypeError:
-                raise Exception(f"  {sig}: error, signal is not present")
+                self.log.debug(f"  {sig}: present (non-sized)")
 
-        # self.backpressure = False
-        # if seednum is not None:
-        #     self.base_seed = seednum
-        # else:
-        #     self.base_seed = randint(0, 0xFFFFFF)
-        # seed(self.base_seed)
-        # self.log.debug(f"Seed is set to {self.base_seed}")
-
-    # @property
-    # def delay(self):
-    #     if self.backpressure:
-    #         if 0 == randint(0, 0x3):
-    #             return randint(0, 0x8)
-    #         else:
-    #             return 0
-    #     else:
-    #         return 0
-
-    def enable_logging(self):
+    def enable_logging(self) -> None:
         self.log.setLevel(logging.DEBUG)
 
-    def disable_logging(self):
+    def disable_logging(self) -> None:
         self.log.setLevel(logging.INFO)
 
-    def enable_backpressure(self, seednum=None):
-        self.backpressure = True
-        if seednum is not None:
-            self.base_seed = seednum
+    def mask_x(self, value: int) -> int:
+        return value & self.x_mask
 
-    def disable_backpressure(self):
-        self.backpressure = False
+    def default_rs_valid(self, rs_valid: int | None = None) -> int:
+        if rs_valid is not None:
+            return rs_valid & self.rs_valid_mask
+        if self.rs_valid_width:
+            return self.rs_valid_mask
+        return 0
+
+    def normalize_rs(self, rs) -> tuple[int, ...]:
+        values = list(rs)
+        while len(values) < self.rs_count:
+            values.append(0)
+        return tuple(self.mask_x(v) for v in values[: self.rs_count])
+
+    async def _wait_reset_release(self) -> None:
+        if self.reset is None:
+            return
+        from cocotb.triggers import RisingEdge, FallingEdge
+
+        active = int(self.reset_active_level)
+        release_edge = RisingEdge if not self.reset_active_level else FallingEdge
+        while int(self.reset.value) == active:
+            await release_edge(self.reset)

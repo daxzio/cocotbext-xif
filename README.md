@@ -10,7 +10,7 @@ GitHub repository: https://github.com/daxzio/cocotbext-xif
 
 Simulation models for the [OpenHW Group CORE-V eXtension Interface (CV-X-IF / XIF)](https://docs.openhwgroup.org/projects/openhw-group-core-v-xif/) for use with [cocotb](https://github.com/cocotb/cocotb).
 
-XIF lets a RISC-V CPU offload instructions to an external coprocessor over independent issue, memory, commit, and result channels. This package provides bus binding, a host-side driver, a monitor, and related helpers for building cocotb testbenches against XIF-attached DUTs.
+XIF lets a RISC-V CPU offload instructions to an external coprocessor over independent issue, memory, commit, and result channels. This package provides bus binding, a host-side driver, a monitor, a device-side model, and related helpers for building cocotb testbenches against XIF-attached DUTs.
 
 Specification: [core-v-xif](https://github.com/openhwgroup/core-v-xif)
 
@@ -33,7 +33,7 @@ Runtime dependency: `cocotb`. The `Bus` helper is vendored in-tree (`cocotbext.x
 
 ## Documentation and usage examples
 
-See the `tests` directory for complete testbenches (`test_xif_copro`, `test_fpu_ss`, `test_ara`).
+See the `tests` directory for complete testbenches (`test_xif_copro`, `test_fpu_ss`, `test_ara`, `test_horcrux`).
 
 ### XIF Bus
 
@@ -44,6 +44,8 @@ from cocotbext.xif import XifBus
 
 bus = XifBus.from_prefix(dut, "s_xif")
 ```
+
+Bus width properties (`xlen`, `id_width`, `mem_data_width`, `rs_count`) are derived from the mapped signals.
 
 #### Required signals (relative to prefix)
 
@@ -57,69 +59,74 @@ bus = XifBus.from_prefix(dut, "s_xif")
 
 #### Optional
 
-`issue_req_ecs`, `issue_req_ecs_valid`, `mem_resp_dbg`, `mem_result_dbg`, `compressed_valid`, `compressed_req`
+`issue_req_rs_2`, `issue_req_ecs`, `issue_req_ecs_valid`, `mem_resp_dbg`, `mem_result_dbg`, `compressed_valid`, `compressed_req`
 
 ### XIF Host
 
-`XifHost` is the CPU/host-side driver. It issues instructions on the XIF, handles commit, and checks results.
+`XifHost` is the CPU/host-side driver. It issues instructions on the XIF, handles commit, checks results, and optionally services the memory channel.
 
 ```python
-from cocotbext.xif import XifBus, XifHost
+from cocotbext.xif import XifBus, XifHost, BitrevEncoder, XifMode
 
 bus = XifBus.from_prefix(dut, "s_xif")
-xif = XifHost(bus, dut.clk_i)
+host = XifHost(bus, dut.clk_i, reset=dut.rst_ni, timeout_max=2000)
 
-# Subclass to customize instruction encoding / expected result, then:
-await xif.exec(rs0=0xDEADBEEF, expected_val=0xF77DB57B)
+enc = BitrevEncoder()
+instr = enc.encode()
+
+await host.execute(
+    instr,
+    rs=(0xDEADBEEF, 0),
+    rs_valid=0x1,
+    mode=XifMode.MMODE,
+    expected=0xF77DB57B,
+)
 ```
 
 #### `XifHost` constructor parameters
 
 * _bus_: `XifBus` with XIF interface signals
 * _clock_: clock signal
-* _timeout_max_: maximum clock cycles to wait for ready/result (optional, default `100`)
+* _reset_: optional reset signal (monitored for release)
+* _reset_active_level_: reset polarity (default `False` = active low)
+* _timeout_max_: maximum clock cycles to wait for ready/result (default `100`)
+* _mem_: optional `Memory` backing store for the memory channel
+* _commit_delay_: cycles to wait before driving commit (default `1`)
 
 #### Methods
 
 * `enable_logging()` / `disable_logging()`: control debug logging
-* `calc_instr(...)`: build the instruction word (override in a subclass for a specific opcode)
-* `calc_result(rs0, rs1, expected_val=-1)`: compute or pass through the expected result (override as needed)
+* `execute(instr, rs=..., rs_valid=..., mode=..., expected=..., check_we=True, commit=True, kill=0, wait_ready_after=False)`: issue one instruction, commit, and wait for the result
+* `issue_nowait(insn)`: queue an `XifInsn` for pipelined issue
+* `wait(insn, wait_ready_after=False)`: wait for the result of a previously issued instruction
 * `commit(id, wait_cycle=1, kill=0)`: drive the commit channel
-* `result(id, expected_val=-1)`: wait for and check the result channel
-* `exec(rs0=0, rs1=0, expected_val=-1, mode=XifMode.MMODE)`: issue the subclass instruction (`calc_instr`), commit, and check the result
-* `exec_insn(instr, rs0=0, rs1=0, ...)`: issue an explicit instruction word, commit, and check the result
+* `wait_idle()`: wait until no instructions are outstanding
 
 Privilege mode values are in `XifMode` (`UMODE`, `SMODE`, `MMODE`).
 
-Example subclass (pattern used in the debug tests):
+### Instruction encoders
+
+DUT-specific instruction encoding lives in encoder classes (staged in `cocotbext.xif.encoders`, intended to move into each testbench over time):
 
 ```python
-from cocotbext.xif import XifHost
+from cocotbext.xif import BitrevEncoder, FaddSEncoder, RvvConfigEncoder, HorcruxEncoder
 
-class BitrevXifHost(XifHost):
-    def calc_instr(self, rd=10, rs1=5, rs2=6, rm=0):
-        instr = 0x2B
-        instr |= (rd & 0x1F) << 7
-        instr |= 0x7 << 12
-        instr |= (rs1 & 0x1F) << 15
-        instr |= 0x02 << 25
-        return instr
-
-    def calc_result(self, rs0, rs1, expected_val=-1):
-        if expected_val != -1:
-            return expected_val
-        return int(f"{rs0:032b}"[::-1], 2)
+enc = BitrevEncoder()
+instr = enc.encode(rd=10, rs1=5)
+expected = enc.model((0xDEADBEEF,))
 ```
+
+Generic RISC-V field packing (`encode_r`, `encode_r4`, `encode_i`) is in `cocotbext.xif.riscv`.
 
 ### XIF Monitor
 
-`XifMonitor` observes XIF transactions and can verify that signal changes are clock-synchronous.
+`XifMonitor` observes all four XIF channels and records transactions.
 
 ```python
 from cocotbext.xif import XifBus, XifMonitor
 
 bus = XifBus.from_prefix(dut, "s_xif")
-monitor = XifMonitor(bus, dut.clk_i)
+monitor = XifMonitor(bus, dut.clk_i, check_protocol=True)
 monitor.enable_logging()
 ```
 
@@ -129,11 +136,18 @@ monitor.enable_logging()
 * `enable_check_sync()`: check that signal changes align with the clock edge
 * `disable_check_sync()`: disable the synchronous signal check
 
-### XIF Device / RAM
+### XIF Device
 
-`XifDevice` is the device-side responder. `XifRam` extends `XifDevice` with an in-memory backing store.
+`XifDevice` is the coprocessor-side model for testing CPU-side DUTs. It accepts issue requests, observes commit, and can drive results and memory requests.
 
-These classes are still evolving; see the package sources and tests for current capabilities.
+```python
+from cocotbext.xif import XifDevice
+
+def handler(insn):
+    return insn.rs[0] + insn.rs[1]
+
+device = XifDevice(bus, dut.clk_i, handler=handler)
+```
 
 ## Running tests
 
@@ -150,5 +164,6 @@ make sim SIM=verilator WAVES=0
 | `tests/test_xif_copro` | Example XIF coprocessor (bitrev) | Pass | Pass |
 | `tests/test_fpu_ss` | FPU subsystem over XIF | Pass | Pass |
 | `tests/test_ara` | PULP Ara vector unit over XIF | Pass | Fail (compile; use Verilator) |
+| `tests/test_horcrux` | HORCRUX crypto coprocessor over XIF | Pass | — |
 
 Icarus runs need a prebuilt Verilog netlist from `make sv2v` where applicable. Prefer `SIM=verilator` for Ara.

@@ -25,14 +25,25 @@ THE SOFTWARE.
 from .version import __version__
 
 from .xif_bus import XifBus
-from .xif_host import XifHost, XifMaster
+from .xif_host import XifHost
 from .xif_monitor import XifMonitor
-from .xif_device import XifDevice, XifSlave
-from .xif_ram import XifRam
+from .xif_device import XifDevice
 
-from .constants import XifProt
-from .constants import XIFSlvErr, XIFPrivilegedErr, XIFInstructionErr
+from .constants import XifMode
 
+from .transaction import XifInsn, XifResult, XifMemReq, XifMemResult, IdAllocator
+
+from .riscv import encode_r, encode_r4, encode_i
+from .encoders import (
+    InsnEncoder,
+    BitrevEncoder,
+    FaddSEncoder,
+    RvvConfigEncoder,
+    HorcruxEncoder,
+    vtype_encode,
+)
+
+from .memory import Memory
 from .address_space import MemoryInterface, Window, WindowPool
 from .address_space import Region, MemoryRegion, SparseMemoryRegion, PeripheralRegion
 from .address_space import AddressSpace, Pool
@@ -40,19 +51,25 @@ from .address_space import AddressSpace, Pool
 __all__ = [
     "__version__",
     "XifBus",
-    "Xif3Bus",
-    "Xif4Bus",
-    "Xif5Bus",
     "XifHost",
-    "XifMaster",
     "XifMonitor",
     "XifDevice",
-    "XifSlave",
-    "XifRam",
-    "XifProt",
-    "XIFSlvErr",
-    "XIFPrivilegedErr",
-    "XIFInstructionErr",
+    "XifMode",
+    "XifInsn",
+    "XifResult",
+    "XifMemReq",
+    "XifMemResult",
+    "IdAllocator",
+    "encode_r",
+    "encode_r4",
+    "encode_i",
+    "InsnEncoder",
+    "BitrevEncoder",
+    "FaddSEncoder",
+    "RvvConfigEncoder",
+    "HorcruxEncoder",
+    "vtype_encode",
+    "Memory",
     "MemoryInterface",
     "Window",
     "WindowPool",

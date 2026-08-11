@@ -22,47 +22,64 @@ THE SOFTWARE.
 
 """
 
-import math
-from typing import Any, Deque, Tuple
+from __future__ import annotations
+
 from collections import deque
+from dataclasses import dataclass
+from typing import Any, Deque, List, Set
 
 from cocotb import start_soon
-from cocotb.triggers import RisingEdge, ReadOnly
+from cocotb.triggers import ReadOnly, RisingEdge
 from cocotb.utils import get_sim_time
 
-from .constants import XifProt
+from .constants import XifMode
+from .transaction import XifInsn, XifMemReq, XifResult
 from .utils import resolve_x_int
 from .xif_base import XifBase
 
 
+@dataclass
+class XifMonitorRecord:
+    channel: str
+    cycle: int
+    txn_id: int
+    data: dict
+
+
 class XifMonitor(XifBase):
-    def __init__(self, bus, clock, **kwargs) -> None:
+    """Passive observer for all four XIF channels."""
+
+    def __init__(self, bus, clock, check_protocol: bool = False, **kwargs) -> None:
         super().__init__(bus, clock, name="monitor", **kwargs)
         self.disable_logging()
+        self.check_protocol = check_protocol
         self.timeout_max = 1000
-        self.timeout = 0
 
-        for i, j in self.bus._signals.items():
-            setattr(self, i, 0)
+        self.records: Deque[XifMonitorRecord] = deque()
+        self._issued_ids: Set[int] = set()
+        self._committed_ids: Set[int] = set()
+        self._result_ids: Set[int] = set()
 
-        self.queue_txn: Deque[Tuple[bool, int, bytes, int, XifProt, int]] = deque()
-        self.txn_id = 0
+        self._issue_valid = 0
+        self._issue_ready = 0
+        self._issue_req_id = 0
+        self._issue_req_instr = 0
+        self._issue_req_mode = 0
+        self._issue_req_rs_0 = 0
+        self._issue_req_rs_1 = 0
+        self._issue_req_rs_valid = 0
+        self._mem_valid = 0
+        self._mem_ready = 0
+        self._commit_valid = 0
+        self._commit_id = 0
+        self._result_valid = 0
+        self._result_id = 0
 
-        self._run_coroutine_obj: Any = None
-        self._resolve_coroutine_obj: Any = None
-        self._check_sync_coroutines: Any = []
-        self._restart()
-
-    def _restart(self) -> None:
-        if self._run_coroutine_obj is not None:
-            self._run_coroutine_obj.kill()
-        if self._resolve_coroutine_obj is not None:
-            self._resolve_coroutine_obj.kill()
-        self._run_coroutine_obj = start_soon(self._run())
-        self._resolve_coroutine_obj = start_soon(self._resolve_signals())
+        self._run_coroutine: Any = start_soon(self._run())
+        self._resolve_coroutine: Any = start_soon(self._resolve_signals())
+        self._check_sync_coroutines: List[Any] = []
 
     def enable_check_sync(self) -> None:
-        """Enable check for synchronous signal changes"""
         self.disable_check_sync()
         self._last_clk_time = get_sim_time()
         self._check_sync_coroutines.append(start_soon(self._check_sync_clock()))
@@ -73,7 +90,6 @@ class XifMonitor(XifBase):
                 )
 
     def disable_check_sync(self) -> None:
-        """Disable check for synchronous signal changes"""
         for coro in self._check_sync_coroutines:
             coro.kill()
         self._check_sync_coroutines.clear()
@@ -91,112 +107,126 @@ class XifMonitor(XifBase):
                 if get_sim_time() != self._last_clk_time:
                     self.log.error(
                         f"Signal {name} changed at {get_sim_time()}, "
-                        f"which is not aligned with the last clock edge at {self._last_clk_time}"
+                        f"which is not aligned with the last clock edge "
+                        f"at {self._last_clk_time}"
                     )
 
-    async def _resolve_signals(self):
+    async def _resolve_signals(self) -> None:
         while True:
-            for i, j in self.bus._signals.items():
-                setattr(self, i, resolve_x_int(getattr(self.bus, i)))
+            for sig in self.bus._signals:
+                if hasattr(self.bus, sig) and getattr(self.bus, sig) is not None:
+                    setattr(self, f"_{sig}", resolve_x_int(getattr(self.bus, sig)))
             await RisingEdge(self.clock)
 
-    @property
-    def empty_txn(self) -> bool:
-        return not self.queue_txn
+    async def _run(self) -> None:
+        prev_issue_valid = 0
+        prev_issue_req_id = 0
+        prev_issue_req_instr = 0
+        stall_timeout = 0
 
-# def build_bitrev_instr(rd, rs1):
-#     """Build a BITREV instruction
-#     Format: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
-#     BITREV: 0000010 | 00000 | rs1 | 111 | rd | 0101011
-#     """
-#     instr = 0
-#     instr |= 0x2B                # opcode [6:0] = 0101011
-#     instr |= (rd & 0x1F) << 7    # rd [11:7]
-#     instr |= 0x7 << 12           # funct3 [14:12] = 111
-#     instr |= (rs1 & 0x1F) << 15  # rs1 [19:15]
-#     instr |= 0x0 << 20           # rs2 [24:20] = 00000 (unused)
-#     instr |= 0x02 << 25          # funct7 [31:25] = 0000010
-#     return instr
-
-
-    async def _run(self):
         while True:
             await RisingEdge(self.clock)
-            self.timeout = 0
+            cycle = get_sim_time("ns")
 
-            if 1 == self.issue_valid:
-                if 1 == self.issue_ready:
-                    txn_id = self.issue_req_id
-                    txn_instr = self.issue_req_instr
-                    txn_mode = self.issue_req_mode
-                    txn_rs_0 = self.issue_req_rs_0
-                    txn_rs_1 = self.issue_req_rs_1
-                    txn_rs_valid = self.issue_req_rs_valid
-                    self.log.info(f"Issue ready: {self.issue_ready}, txn_id: {txn_id}, instr: 0x{txn_instr:08X}, mode: {txn_mode}, rs_0: 0x{txn_rs_0:08X}, rs_1: 0x{txn_rs_1:08X}, rs_valid: {txn_rs_valid}")
-                else:
-                    self.timeout += 1
-                    if self.timeout >= self.timeout_max:
-                        raise Exception(
-                            f"issue_ready wait has exceed timout {self.timeout_max}"
-                        )
+            if self._issue_valid and not self._issue_ready:
+                stall_timeout += 1
+                if (
+                    self.check_protocol
+                    and prev_issue_valid
+                    and prev_issue_req_id == self._issue_req_id
+                    and prev_issue_req_instr == self._issue_req_instr
+                ):
+                    pass
+                elif (
+                    self.check_protocol
+                    and prev_issue_valid
+                    and (
+                        prev_issue_req_id != self._issue_req_id
+                        or prev_issue_req_instr != self._issue_req_instr
+                    )
+                ):
+                    self.log.error(
+                        "Issue request changed while issue_ready was low "
+                        "(id %d -> %d)",
+                        prev_issue_req_id,
+                        self._issue_req_id,
+                    )
+                if stall_timeout >= self.timeout_max:
+                    raise TimeoutError(
+                        f"issue_ready stall exceeded {self.timeout_max} cycles"
+                    )
+            else:
+                stall_timeout = 0
 
+            if self._issue_valid and self._issue_ready:
+                txn_id = self._issue_req_id
+                self._issued_ids.add(txn_id)
+                rec = XifMonitorRecord(
+                    channel="issue",
+                    cycle=cycle,
+                    txn_id=txn_id,
+                    data={
+                        "instr": self._issue_req_instr,
+                        "mode": self._issue_req_mode,
+                        "rs_0": self._issue_req_rs_0,
+                        "rs_1": self._issue_req_rs_1,
+                        "rs_valid": self._issue_req_rs_valid,
+                    },
+                )
+                self.records.append(rec)
+                self.log.info(
+                    "Issue id=%d instr=0x%08x mode=%d rs0=0x%x rs1=0x%x rs_valid=%d",
+                    txn_id,
+                    self._issue_req_instr,
+                    self._issue_req_mode,
+                    self._issue_req_rs_0,
+                    self._issue_req_rs_1,
+                    self._issue_req_rs_valid,
+                )
 
+            if self._commit_valid:
+                txn_id = self._commit_id
+                self._committed_ids.add(txn_id)
+                self.records.append(
+                    XifMonitorRecord(
+                        channel="commit",
+                        cycle=cycle,
+                        txn_id=txn_id,
+                        data={},
+                    )
+                )
+                if self.check_protocol and txn_id not in self._issued_ids:
+                    self.log.error("Commit for id %d that was never issued", txn_id)
 
+            if self._result_valid:
+                txn_id = self._result_id
+                self._result_ids.add(txn_id)
+                self.records.append(
+                    XifMonitorRecord(
+                        channel="result",
+                        cycle=cycle,
+                        txn_id=txn_id,
+                        data={"id": txn_id},
+                    )
+                )
+                if self.check_protocol and txn_id not in self._committed_ids:
+                    self.log.error("Result for id %d before commit", txn_id)
+                if self.check_protocol and txn_id not in self._issued_ids:
+                    self.log.error("Result for id %d that was never issued", txn_id)
 
+            if self._mem_valid and self._mem_ready:
+                self.records.append(
+                    XifMonitorRecord(
+                        channel="mem",
+                        cycle=cycle,
+                        txn_id=resolve_x_int(self.bus.mem_req_id),
+                        data={
+                            "addr": resolve_x_int(self.bus.mem_req_addr),
+                            "we": resolve_x_int(self.bus.mem_req_we),
+                        },
+                    )
+                )
 
-#                 device = int(math.log2(self.psel))
-#                 if not self.psel == 2**device:
-#                     self.log.critical(f"incorrect formatted psel {self.psel}")
-
-#                 if self.paddr < 0 or self.paddr >= 2**self.address_width:
-#                     raise ValueError("Address out of range")
-
-#                 if self.penable_present and 1 == self.penable:
-#                     self.log.critical(
-#                         "penable is asserted in the same first cycle with psel"
-#                     )
-
-#                 pwrite = self.pwrite
-#                 paddr = self.paddr
-#                 pstrb = self.strb_mask
-#                 if self.pstrb_present:
-#                     pstrb = self.pstrb
-#                 extra_text = ""
-#                 if self.pprot_present:
-#                     pprot = self.pprot
-#                     extra_text += f" prot: {pprot}"
-#                 else:
-#                     pprot = XifProt.NONSECURE
-#                 apb = ""
-#                 if self.multi_device:
-#                     apb = f"({device}) "
-
-#                 wdata = self.pwdata
-#                 await RisingEdge(self.clock)
-#                 if self.penable_present and 0 == self.penable:
-#                     self.log.critical(
-#                         f"penable is not asserted in the second cycle after psel {self.penable}"
-#                     )
-#                 while 0 == (self.pready and self.psel):
-#                     await RisingEdge(self.clock)
-#                     self.timeout += 1
-#                     if self.timeout >= self.timeout_max:
-#                         raise Exception(
-#                             f"pready wait has exceed timout {self.timeout_max}"
-#                         )
-
-#                 if pwrite:
-#                     data = wdata
-#                     self.log.debug(
-#                         f"Write {apb}0x{paddr:08x}: 0x{data:08x}{extra_text}"
-#                     )
-#                 else:
-#                     data = (self.prdata >> 32 * device) & self.rdata_mask[device]
-#                     self.log.debug(
-#                         f"Read  {apb}0x{paddr:08x}: 0x{data:08x}{extra_text}"
-#                     )
-#                 self.queue_txn.append((pwrite, paddr, data, pstrb, pprot, self.txn_id))
-#                 self.txn_id += 1
-
-
-# #             await RisingEdge(self.clock)
+            prev_issue_valid = self._issue_valid
+            prev_issue_req_id = self._issue_req_id
+            prev_issue_req_instr = self._issue_req_instr

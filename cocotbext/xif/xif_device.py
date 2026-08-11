@@ -22,141 +22,236 @@ THE SOFTWARE.
 
 """
 
+from __future__ import annotations
+
+from collections import deque
+from typing import Any, Callable, Deque, Dict, Optional
+
 from cocotb import start_soon
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import Event, RisingEdge
 
+from .constants import XifMode
+from .memory import Memory
+from .transaction import IdAllocator, XifInsn, XifMemReq, XifResult
 from .xif_base import XifBase
-from .constants import XifProt
-from .constants import XIFPrivilegedErr, XIFInstructionErr
-
-# from .reset import Reset
-#
-from typing import Any
 
 
-class InvalidAccess(Exception):
-    pass
+Handler = Callable[[XifInsn], Optional[int]]
 
 
 class XifDevice(XifBase):
-    def __init__(self, bus, clock, target=None, **kwargs):
-        super().__init__(bus, clock, name="device", **kwargs)
-        #         self.reset = reset
-        self.target = target
-        self.privileged_addrs = []
-        self.instruction_addrs = []
+    """Coprocessor-side XIF model: accepts issue, drives result and mem channels."""
 
-        self.bus.pready.value = 0
-        self.bus.prdata.value = 0
-        if self.pslverr_present:
-            self.bus.pslverr.value = 0
-
-        self._run_coroutine_obj: Any = None
-        self._restart()
-
-    def _restart(self) -> None:
-        if self._run_coroutine_obj is not None:
-            self._run_coroutine_obj.kill()
-        self._run_coroutine_obj = start_soon(self._run())
-
-    def check_address(self, address, prot, addresses, prot_type, exception):
-        if prot is not None and int(prot) != prot_type:
-            for addrs in addresses:
-                if isinstance(addrs, int):
-                    if addrs == address:
-                        raise exception
-                elif isinstance(addrs, (list, tuple)):
-                    if addrs[1] < addrs[0]:
-                        raise Exception(
-                            f"Address range needs to be increasing , {addrs}"
-                        )
-                    if not 2 == len(addrs):
-                        raise Exception(f"Address range needs to be 2 value , {addrs}")
-                    if addrs[0] <= address < addrs[1]:
-                        raise exception
-                else:
-                    raise Exception(f"Unknown addr type , {addrs}")
-
-    def check_permission(self, address, prot):
-        self.check_address(
-            address, prot, self.privileged_addrs, XifProt.PRIVILEGED, XIFPrivilegedErr
-        )
-        self.check_address(
-            address,
-            prot,
-            self.instruction_addrs,
-            XifProt.INSTRUCTION,
-            XIFInstructionErr,
+    def __init__(
+        self,
+        bus,
+        clock,
+        reset=None,
+        reset_active_level: bool = False,
+        handler: Optional[Handler] = None,
+        mem: Optional[Memory] = None,
+        latency: int = 0,
+        accept_delay: int = 0,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            bus,
+            clock,
+            name="device",
+            reset=reset,
+            reset_active_level=reset_active_level,
+            **kwargs,
         )
 
-    async def _write(self, address, data, strb=None, prot=None):
-        self.check_permission(address, prot)
-        if strb is None:
-            await self.target.write(address, data)
-        else:
-            for i in range(self.byte_lanes):
-                if 1 == ((int(strb.value) >> i) & 0x1):
-                    await self.target.write_byte(
-                        address + i, data[i].to_bytes(1, "little")
-                    )
+        self.handler = handler
+        self.mem = mem
+        self.latency = latency
+        self.accept_delay = accept_delay
 
-    async def _read(self, address, length, prot=None):
-        self.check_permission(address, prot)
-        return await self.target.read(address, length)
+        self._ids = IdAllocator(self.id_width)
+        self._issue_queue: Deque[XifInsn] = deque()
+        self._pending: Dict[int, XifInsn] = {}
 
-    async def _run(self):
+        self._init_device_signals()
+
+        self._issue_coroutine: Any = start_soon(self._run_issue())
+        self._commit_coroutine: Any = start_soon(self._run_commit())
+        self._result_coroutine: Any = start_soon(self._run_result())
+        if self.mem is not None:
+            self._mem_coroutine: Any = start_soon(self._run_mem())
+
+    def _init_device_signals(self) -> None:
+        self.bus.issue_ready.value = 1
+        self.bus.issue_resp_accept.value = 0
+        self.bus.issue_resp_writeback.value = 0
+        self.bus.issue_resp_dualwrite.value = 0
+        self.bus.issue_resp_dualread.value = 0
+        self.bus.issue_resp_loadstore.value = 0
+        self.bus.issue_resp_exc.value = 0
+
+        self.bus.mem_valid.value = 0
+        self.bus.mem_req_id.value = 0
+        self.bus.mem_req_addr.value = 0
+        self.bus.mem_req_mode.value = 0
+        self.bus.mem_req_we.value = 0
+        self.bus.mem_req_size.value = 0
+        self.bus.mem_req_be.value = 0
+        self.bus.mem_req_wdata.value = 0
+        self.bus.mem_req_last.value = 0
+
+        self.bus.result_valid.value = 0
+        self.bus.result_id.value = 0
+        self.bus.result_data.value = 0
+        self.bus.result_rd.value = 0
+        self.bus.result_we.value = 0
+        self.bus.result_exc.value = 0
+        self.bus.result_exccode.value = 0
+
+    def queue_insn(self, insn: XifInsn) -> XifInsn:
+        """Software model: enqueue a response for an instruction handled internally."""
+        if insn.id == 0:
+            insn.id = self._ids.alloc()
+        self._issue_queue.append(insn)
+        self._pending[insn.id] = insn
+        return insn
+
+    async def drive_result(
+        self,
+        txn_id: int,
+        data: int,
+        rd: int = 0,
+        we: bool = True,
+        exc: bool = False,
+        exccode: int = 0,
+    ) -> None:
+        for _ in range(self.latency):
+            await RisingEdge(self.clock)
+        self.bus.result_valid.value = 1
+        self.bus.result_id.value = txn_id
+        self.bus.result_data.value = self.mask_x(data)
+        self.bus.result_rd.value = rd
+        self.bus.result_we.value = int(we)
+        self.bus.result_exc.value = int(exc)
+        self.bus.result_exccode.value = exccode
         await RisingEdge(self.clock)
+        self.bus.result_valid.value = 0
+        self.bus.result_id.value = 0
+        self.bus.result_data.value = 0
+        self.bus.result_rd.value = 0
+        self.bus.result_we.value = 0
+        self.bus.result_exc.value = 0
+        self.bus.result_exccode.value = 0
+        self._pending.pop(txn_id, None)
+        self._ids.release(txn_id)
+
+    async def _run_issue(self) -> None:
+        await self._wait_reset_release()
         while True:
             await RisingEdge(self.clock)
-            pprot = None
-            if self.pprot_present:
-                pprot = self.bus.pprot
-            pstrb = None
-            if self.pstrb_present:
-                pstrb = self.bus.pstrb
-            if bool(self.bus.psel.value):
-                addr = int(self.bus.paddr.value)
-                pwrite = bool(self.bus.pwrite.value)
+            if int(self.bus.issue_valid.value) != 1:
+                self.bus.issue_resp_accept.value = 0
+                continue
 
-                if addr < 0 or addr >= 2**self.address_width:
-                    raise ValueError("Address out of range")
-
-                for i in range(self.delay):
-                    await RisingEdge(self.clock)
-
-                self.bus.pready.value = 1
-                try:
-                    if pwrite:
-                        wdata = int(self.bus.pwdata.value)
-                        await self._write(
-                            addr,
-                            wdata.to_bytes(self.byte_lanes, "little"),
-                            pstrb,
-                            pprot,
-                        )
-                        self.log.debug(f"Write 0x{addr:08x} 0x{wdata:08x}")
-                    else:
-                        self.bus.prdata.value = 0
-                        x = await self._read(addr, self.byte_lanes, pprot)
-                        rdata = int.from_bytes(x, byteorder="little")
-                        self.bus.prdata.value = rdata
-                        self.log.debug(f"Read  0x{addr:08x} 0x{rdata:08x}")
-                except XIFPrivilegedErr:
-                    self.log.warning(f"Access 0x{addr:08x} Invalid, PrivilegedErr")
-                    if self.pslverr_present:
-                        self.bus.pslverr.value = 1
-                except XIFInstructionErr:
-                    self.log.warning(f"Access 0x{addr:08x} Invalid, InstructionErr")
-                    if self.pslverr_present:
-                        self.bus.pslverr.value = 1
+            for _ in range(self.accept_delay):
                 await RisingEdge(self.clock)
-                self.bus.pready.value = 0
-                self.bus.prdata.value = 0
-                if self.pslverr_present:
-                    self.bus.pslverr.value = 0
 
+            rs = self.normalize_rs(
+                (
+                    int(self.bus.issue_req_rs_0.value),
+                    int(self.bus.issue_req_rs_1.value),
+                    int(self.bus.issue_req_rs_2.value)
+                    if self.bus.has_rs_2
+                    else 0,
+                )
+            )
+            insn = XifInsn(
+                instr=self.mask_x(int(self.bus.issue_req_instr.value)),
+                rs=rs,
+                rs_valid=int(self.bus.issue_req_rs_valid.value),
+                mode=XifMode(int(self.bus.issue_req_mode.value)),
+                id=int(self.bus.issue_req_id.value),
+            )
+            self._pending[insn.id] = insn
+            self.bus.issue_resp_accept.value = 1
+            self.bus.issue_resp_writeback.value = 1
+            self.log.debug(
+                "Accepted issue id=%d instr=0x%08x", insn.id, insn.instr
+            )
 
-class XifSlave(XifDevice):
-    """Deprecated alias for XifDevice."""
+    async def _run_commit(self) -> None:
+        await self._wait_reset_release()
+        while True:
+            await RisingEdge(self.clock)
+            if int(self.bus.commit_valid.value) != 1:
+                continue
+            txn_id = int(self.bus.commit_id.value)
+            kill = bool(int(self.bus.commit_kill.value))
+            insn = self._pending.get(txn_id)
+            if insn is None:
+                self.log.warning("Commit for unknown id %d", txn_id)
+                continue
+            if kill:
+                self._pending.pop(txn_id, None)
+                self._ids.release(txn_id)
+                continue
+            insn.committed = True
+            if self.handler is not None:
+                result_data = self.handler(insn)
+                if result_data is not None:
+                    await self.drive_result(txn_id, result_data)
 
-    pass
+    async def _run_result(self) -> None:
+        await self._wait_reset_release()
+        while True:
+            await RisingEdge(self.clock)
+
+    async def _run_mem(self) -> None:
+        assert self.mem is not None
+        await self._wait_reset_release()
+        while True:
+            await RisingEdge(self.clock)
+            if int(self.bus.mem_result_valid.value) != 1:
+                continue
+            txn_id = int(self.bus.mem_result_id.value)
+            rdata = self.mask_x(int(self.bus.mem_result_rdata.value))
+            err = bool(int(self.bus.mem_result_err.value))
+            self.log.debug(
+                "Mem result id=%d rdata=0x%x err=%s", txn_id, rdata, err
+            )
+
+    async def mem_request(
+        self,
+        addr: int,
+        we: bool = False,
+        wdata: int = 0,
+        size: int = 2,
+        be: int | None = None,
+        mode: XifMode = XifMode.MMODE,
+        last: bool = True,
+    ) -> None:
+        """Drive a memory request from the coprocessor."""
+        txn_id = self._ids.alloc()
+        if be is None:
+            be = (1 << (1 << size)) - 1
+        self.bus.mem_valid.value = 1
+        self.bus.mem_req_id.value = txn_id
+        self.bus.mem_req_addr.value = addr
+        self.bus.mem_req_mode.value = int(mode)
+        self.bus.mem_req_we.value = int(we)
+        self.bus.mem_req_size.value = size
+        self.bus.mem_req_be.value = be
+        self.bus.mem_req_wdata.value = self.mask_x(wdata)
+        self.bus.mem_req_last.value = int(last)
+        await RisingEdge(self.clock)
+        while int(self.bus.mem_ready.value) != 1:
+            await RisingEdge(self.clock)
+        self.bus.mem_valid.value = 0
+        self.bus.mem_req_id.value = 0
+        self.bus.mem_req_addr.value = 0
+        self.bus.mem_req_mode.value = 0
+        self.bus.mem_req_we.value = 0
+        self.bus.mem_req_size.value = 0
+        self.bus.mem_req_be.value = 0
+        self.bus.mem_req_wdata.value = 0
+        self.bus.mem_req_last.value = 0
+        self._ids.release(txn_id)
