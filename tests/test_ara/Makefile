@@ -18,9 +18,9 @@ MODULE = test_dut
 
 # ---------- Include dirs (coprocessor only) ----------
 VERILOG_INCLUDE_DIRS += \
-	$(ASIC_DIR)/common_cells/include \
-	$(ASIC_DIR)/axi/include \
-	$(ASIC_DIR)/cva6/core/include \
+	$(ASIC_DIR)/common_cells.bck/include \
+	$(ASIC_DIR)/axi.bck/include \
+	$(ASIC_DIR)/cva6.bck/core/include \
 	$(ASIC_DIR)/ara/hardware/include
 
 # ---------- Defines ----------
@@ -34,49 +34,46 @@ DEFINES += \
 # Omitted: wt_cache_pkg, std_cache_pkg (CVA6 cache); fpga-support-stubs, tc_sram_wrapper*,
 # sram_pulp, sram_cache (CVA6 SoC/cache). Ara VRF uses tc_sram from tech_cells_generic.
 EXT_VERILOG_SOURCES += \
-	$(ASIC_DIR)/cva6/core/include/config_pkg.sv \
-	$(ASIC_DIR)/cva6/core/include/cv64a6_imafdcv_sv39_config_pkg.sv \
-	$(ASIC_DIR)/cva6/core/include/riscv_pkg.sv \
-	$(ASIC_DIR)/cva6/core/include/ariane_pkg.sv \
-	$(ASIC_DIR)/cva6/core/include/build_config_pkg.sv \
-	$(ASIC_DIR)/cva6/core/serdiv.sv
+	$(ASIC_DIR)/cva6/include/config_pkg.sv \
+	$(ASIC_DIR)/cva6/include/cv64a6_imafdcv_sv39_config_pkg.sv \
+	$(ASIC_DIR)/cva6/include/riscv_pkg.sv \
+	$(ASIC_DIR)/cva6/include/ariane_pkg.sv \
+	$(ASIC_DIR)/cva6/include/build_config_pkg.sv \
+	$(ASIC_DIR)/cva6/serdiv.sv
 
 # ---------- AXI (pkg + intf for types; axi_cut, axi_to_detailed_mem, axi_zero_mem) ----------
 EXT_VERILOG_SOURCES += \
-	$(ASIC_DIR)/axi/src/axi_pkg.sv \
-	$(ASIC_DIR)/axi/src/axi_intf.sv \
-	$(ASIC_DIR)/axi/src/axi_cut.sv \
-	$(ASIC_DIR)/axi/src/axi_to_detailed_mem.sv \
-	$(ASIC_DIR)/axi/src/axi_zero_mem.sv
+	$(ASIC_DIR)/axi/axi_pkg.sv \
+	$(ASIC_DIR)/axi/axi_intf.sv \
+	$(ASIC_DIR)/axi/axi_cut.sv \
+	$(ASIC_DIR)/axi/axi_to_detailed_mem.sv \
+	$(ASIC_DIR)/axi/axi_zero_mem.sv
 
 # ---------- Common cells (from hierarchy + packages/deps needed by above) ----------
-COMMON_CELLS := $(ASIC_DIR)/common_cells
 EXT_VERILOG_SOURCES += \
-	$(COMMON_CELLS)/src/cf_math_pkg.sv \
-	$(COMMON_CELLS)/src/spill_register.sv \
-	$(COMMON_CELLS)/src/spill_register_flushable.sv \
-	$(COMMON_CELLS)/src/stream_fifo.sv \
-	$(COMMON_CELLS)/src/stream_fork.sv \
-	$(COMMON_CELLS)/src/stream_fork_dynamic.sv \
-	$(COMMON_CELLS)/src/stream_join.sv \
-	$(COMMON_CELLS)/src/stream_join_dynamic.sv \
-	$(COMMON_CELLS)/src/stream_to_mem.sv \
-	$(COMMON_CELLS)/src/stream_mux.sv \
-	$(COMMON_CELLS)/src/stream_demux.sv \
-	$(COMMON_CELLS)/src/stream_xbar.sv \
-	$(COMMON_CELLS)/src/stream_intf.sv \
-	$(COMMON_CELLS)/src/mem_to_banks_detailed.sv \
-	$(COMMON_CELLS)/src/lzc.sv \
-	$(COMMON_CELLS)/src/popcount.sv \
-	$(COMMON_CELLS)/src/fifo_v3.sv \
-	$(COMMON_CELLS)/src/delta_counter.sv \
-	$(COMMON_CELLS)/src/counter.sv \
-	$(COMMON_CELLS)/src/fall_through_register.sv
+	$(ASIC_DIR)/common_cells/cf_math_pkg.sv \
+	$(ASIC_DIR)/common_cells/spill_register.sv \
+	$(ASIC_DIR)/common_cells/spill_register_flushable.sv \
+	$(ASIC_DIR)/common_cells/stream_fifo.sv \
+	$(ASIC_DIR)/common_cells/stream_fork.sv \
+	$(ASIC_DIR)/common_cells/stream_fork_dynamic.sv \
+	$(ASIC_DIR)/common_cells/stream_join.sv \
+	$(ASIC_DIR)/common_cells/stream_join_dynamic.sv \
+	$(ASIC_DIR)/common_cells/stream_to_mem.sv \
+	$(ASIC_DIR)/common_cells/stream_mux.sv \
+	$(ASIC_DIR)/common_cells/stream_demux.sv \
+	$(ASIC_DIR)/common_cells/stream_xbar.sv \
+	$(ASIC_DIR)/common_cells/stream_intf.sv \
+	$(ASIC_DIR)/common_cells/mem_to_banks_detailed.sv \
+	$(ASIC_DIR)/common_cells/lzc.sv \
+	$(ASIC_DIR)/common_cells/popcount.sv \
+	$(ASIC_DIR)/common_cells/fifo_v3.sv \
+	$(ASIC_DIR)/common_cells/delta_counter.sv \
+	$(ASIC_DIR)/common_cells/counter.sv \
+	$(ASIC_DIR)/common_cells/fall_through_register.sv
 
 # ---------- FPnew (ara_pkg + lane vmfpu), tech_cells (VRF), common_cells extras ----------
 FPNEW := $(ASIC_DIR)/ara.bck/hardware/deps/fpnew
-FPDS := $(ASIC_DIR)/fpu_div_sqrt_mvp
-TC := $(ASIC_DIR)/tech_cells_generic
 EXT_VERILOG_SOURCES += \
 	$(FPNEW)/src/fpnew_pkg.sv \
 	$(FPNEW)/src/fpnew_rounding.sv \
@@ -95,20 +92,20 @@ EXT_VERILOG_SOURCES += \
 	$(FPNEW)/src/fpnew_sdotp_multi.sv \
 	$(FPNEW)/src/fpnew_sdotp_multi_wrapper.sv \
 	$(FPNEW)/src/fpnew_top.sv \
-	$(FPDS)/hdl/defs_div_sqrt_mvp.sv \
-	$(FPDS)/hdl/control_mvp.sv \
-	$(FPDS)/hdl/preprocess_mvp.sv \
-	$(FPDS)/hdl/iteration_div_sqrt_mvp.sv \
-	$(FPDS)/hdl/norm_div_sqrt_mvp.sv \
-	$(FPDS)/hdl/nrbd_nrsc_mvp.sv \
-	$(FPDS)/hdl/div_sqrt_mvp_wrapper.sv \
-	$(FPDS)/hdl/div_sqrt_top_mvp.sv \
-	$(TC)/src/rtl/tc_sram.sv \
-	$(TC)/src/rtl/tc_sram_impl.sv \
-	$(TC)/src/rtl/tc_clk.sv \
-	$(COMMON_CELLS)/src/stream_register.sv \
-	$(COMMON_CELLS)/src/rr_arb_tree.sv \
-	$(COMMON_CELLS)/src/mem_to_banks.sv
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/defs_div_sqrt_mvp.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/control_mvp.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/preprocess_mvp.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/iteration_div_sqrt_mvp.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/norm_div_sqrt_mvp.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/nrbd_nrsc_mvp.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/div_sqrt_mvp_wrapper.sv \
+	$(ASIC_DIR)/fpu_div_sqrt_mvp/div_sqrt_top_mvp.sv \
+	$(ASIC_DIR)/tech_cells_generic/tc_sram.sv \
+	$(ASIC_DIR)/tech_cells_generic/tc_sram_impl.sv \
+	$(ASIC_DIR)/tech_cells_generic/tc_clk.sv \
+	$(ASIC_DIR)/common_cells/stream_register.sv \
+	$(ASIC_DIR)/common_cells/rr_arb_tree.sv \
+	$(ASIC_DIR)/common_cells/mem_to_banks.sv
 
 # ---------- Ara coprocessor RTL (from hierarchy, deduplicated) ----------
 EXT_VERILOG_SOURCES += \
@@ -165,6 +162,7 @@ IGNORE_ARGS += -Wno-SIDEEFFECT
 # Parallel Verilator C++ build (large speedup). Override with BUILD_ARGS= if needed.
 BUILD_ARGS += -j$(shell nproc 2>/dev/null || echo 8)
 
+# Icarus: single .v from sv2v (run "make sv2v" first). Override before include so VERILOG_DESIGN is correct.
 ifeq ($(SIM),icarus)
 INT_VERILOG_SOURCES := ./ara_xif_wrapper.v
 EXT_VERILOG_SOURCES :=
@@ -172,18 +170,25 @@ endif
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
 
+# Icarus sim needs ara_xif_wrapper.v; no rule to build it → run "make sv2v" first.
+ifeq ($(SIM),icarus)
+sim_build_icarus/sim.vvp: ara_xif_wrapper.v
+endif
+
 # ARA_SV2V_DEFINES := NR_LANES=2 VLEN=128 ARIANE_ACCELERATOR_PORT=1 COMMON_CELLS_ASSERTS_OFF VERILATOR
 SV2V_STRIP_DPI := $(RTLFLO_PATH)/scripts/strip_dpi_verilog.py
 SV2V_FIX_CONSTFUNC := $(RTLFLO_PATH)/scripts/fix_fpnew_constfunc_verilog.py
+SV2V_FIX_IDX_WIDTH := $(RTLFLO_PATH)/scripts/fix_idx_width_verilog.py
 
-sv2v: $(SV2V_STRIP_DPI) $(SV2V_FIX_CONSTFUNC)
+sv2v: $(SV2V_STRIP_DPI) $(SV2V_FIX_CONSTFUNC) $(SV2V_FIX_IDX_WIDTH)
 	sv2v \
         $(addprefix -I, $(VERILOG_INCLUDE_DIRS)) \
         $(addprefix -D, $(DEFINES)) -DVERILATOR \
 		--top $(TOPLEVEL) $(EXT_VERILOG_SOURCES)  $(INT_VERILOG_SOURCES) \
         --write=ara_xif_wrapper_temp.v
-	python3 $(RTLFLO_PATH)/scripts/strip_dpi_verilog.py ara_xif_wrapper_temp.v ara_xif_wrapper.v
-	python3 $(RTLFLO_PATH)/scripts/fix_fpnew_constfunc_verilog.py ara_xif_wrapper.v
+	python3 $(SV2V_STRIP_DPI) ara_xif_wrapper_temp.v ara_xif_wrapper.v
+	python3 $(SV2V_FIX_CONSTFUNC) ara_xif_wrapper.v
+	python3 $(SV2V_FIX_IDX_WIDTH) ara_xif_wrapper.v
 	@rm -f ara_xif_wrapper_temp.v 
 
 

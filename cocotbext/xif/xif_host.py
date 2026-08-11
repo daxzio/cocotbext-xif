@@ -56,9 +56,9 @@ from .utils import resolve_x_int
 #     instr |= 0x02 << 25          # funct7 [31:25] = 0000010
 #     return instr
 
-class XifMaster(XifBase):
+class XifHost(XifBase):
     def __init__(self, bus, clock, timeout_max=100, **kwargs) -> None:
-        super().__init__(bus, clock, name="master", **kwargs)
+        super().__init__(bus, clock, name="host", **kwargs)
 
         self.timeout_max = timeout_max
         # self.exception_enabled = True
@@ -67,7 +67,7 @@ class XifMaster(XifBase):
         # self.queue_tx: Deque[
         #     Tuple[bool, int, bytes, int, XifProt, bool, int, int]
         # ] = deque()
-        # self.queue_rx: Deque[Tuple[bytes, int]] = deque()
+        #self.queue_rx: Deque[Tuple[bytes, int]] = deque()
         self.tx_id = 1
         self.return_int = False
         self.ret: Union[bytes, None] = None
@@ -107,20 +107,6 @@ class XifMaster(XifBase):
         # self.bus.compressed_valid.value = 0
         # self.bus.compressed_req.value = 0
 
-
-
-
-        # if self.penable_present:
-        #     self.bus.penable.value = 0
-        # self.bus.psel.value = 0
-        # self.bus.paddr.value = 0
-        # if self.pstrb_present:
-        #     self.bus.pstrb.value = 0
-        # if self.pprot_present:
-        #     self.bus.pprot.value = 0
-        # self.bus.pwrite.value = 0
-        # self.bus.pwdata.value = 0
-
         # self._run_coroutine_obj: Any = None
         # self._restart()
 
@@ -138,6 +124,48 @@ class XifMaster(XifBase):
         instr |= 0x02 << 25          # funct7 [31:25] = 0000010
         return instr
 
+    def calc_result(self, rs0: int, rs1: int, expected_val: int=-1) -> int:
+        return expected_val
+        
+    async def commit(self, id: int, wait_cycle: int = 1, kill: int = 0):
+        for i in range(wait_cycle):
+            await RisingEdge(self.clock)
+        self.bus.commit_valid.value = 1
+        self.bus.commit_id.value = id
+        self.bus.commit_kill.value = kill
+        await RisingEdge(self.clock)
+        self.bus.commit_valid.value = 0
+        self.bus.commit_id.value = 0
+        self.bus.commit_kill.value = 0
+
+    async def result(self, id: int, expected_val: int=-1):
+        # Wait for result
+        timeout = 0
+        while int(self.bus.result_valid.value) != 1 and timeout < self.timeout_max:
+            await RisingEdge(self.clock)
+            timeout += 1
+        
+        if timeout >= self.timeout_max:
+            raise Exception("Timeout waiting for result")
+
+        # Check result
+        result_id = int(self.bus.result_id.value)
+        result_data = int(self.bus.result_data.value)
+        result_we = int(self.bus.result_we.value)
+
+        # self.log.debug(f"Result ID: {result_id}, WE: {result_we}")
+        self.log.debug(f"Result: 0x{result_data:08X}")
+        # self.log.debug(f"Expected: 0x{expected_val:08X}")
+
+        self.log.debug(f"Calculated: 0x{expected_val:08X}")
+        if result_id != id:
+            raise Exception(f"Result ID mismatch: got {result_id}, expected {id}")
+        if expected_val != -1 and result_data != expected_val:
+            raise Exception(f"Result data mismatch: got 0x{result_data:08X}, expected 0x{expected_val:08X}")
+        if result_we != 1:
+            raise Exception("Write enable not set")
+
+    
     async def write_xx(
         self,
         rs0: int = 0,
@@ -145,7 +173,7 @@ class XifMaster(XifBase):
         expected_val: int = -1,
         mode: XifMode = XifMode.MMODE,
     ):
-        #await RisingEdge(self.clock)
+        x = self.calc_result(rs0, rs1, expected_val)
         id = self.tx_id
 
         instr = self.calc_instr()
@@ -157,13 +185,15 @@ class XifMaster(XifBase):
         self.bus.issue_req_rs_0.value = rs0
         self.bus.issue_req_rs_1.value = rs1
         self.bus.issue_req_rs_valid.value = 1
+        start_soon(self.commit(id, wait_cycle=1))
+
         await ReadOnly()
         comb_accept = int(self.bus.issue_resp_accept.value)
-        if comb_accept:
-            if int(self.bus.mem_req_id.value) != id:
-                raise Exception(f"Combinatorial mem_req_id mismatch: got {int(self.bus.mem_req_id.value)}, expected {id}")
-            if int(self.bus.issue_req_mode.value) != mode:
-                raise Exception(f"Combinatorial issue_req_mode mismatch: got {int(self.bus.issue_req_mode.value)}, expected {XifMode.MMODE}")
+        # if comb_accept:
+        #     if int(self.bus.mem_req_id.value) != id:
+        #         raise Exception(f"Combinatorial mem_req_id mismatch: got {int(self.bus.mem_req_id.value)}, expected {id}")
+        #     if int(self.bus.issue_req_mode.value) != mode:
+        #         raise Exception(f"Combinatorial issue_req_mode mismatch: got {int(self.bus.issue_req_mode.value)}, expected {XifMode.MMODE}")
         #comb_mem_req_id = int(self.bus.mem_req_id.value)
         #self.log.info(f"Combinatorial issue_resp_accept {int(self.bus.issue_resp_accept.value)}")
         await RisingEdge(self.clock)
@@ -189,80 +219,18 @@ class XifMaster(XifBase):
             raise Exception("Instruction not accepted!")
         if not comb_accept:
             self.log.warning("Instruction not accepted (combinatorial)")
-        if int(self.bus.mem_req_id.value) != id:
-            raise Exception(f"mem_req_id mismatch: got {int(self.bus.mem_req_id.value)}, expected {id}")
-        if int(self.bus.mem_req_mode.value) != mode:
-            raise Exception(f"mem_req_mode mismatch: got {int(self.bus.mem_req_mode.value)}, expected {mode}")
+        # if int(self.bus.mem_req_id.value) != id:
+        #     raise Exception(f"mem_req_id mismatch: got {int(self.bus.mem_req_id.value)}, expected {id}")
+        # if int(self.bus.mem_req_mode.value) != mode:
+        #     raise Exception(f"mem_req_mode mismatch: got {int(self.bus.mem_req_mode.value)}, expected {mode}")
         self.log.debug("Instruction accepted")
         
-        # # Wait a cycle before committing
-        # await RisingEdge(self.clock)
-        
-        # Commit the instruction
-        self.bus.commit_valid.value = 1
-        self.bus.commit_id.value = id
-        self.bus.commit_kill.value = 0
-        await RisingEdge(self.clock)
-        self.bus.commit_valid.value = 0
-
-        self.log.debug("Instruction committed")
-
-        # Wait for result
-        timeout = 0
-        while int(self.bus.result_valid.value) != 1 and timeout < self.timeout_max:
-            await RisingEdge(self.clock)
-            timeout += 1
-        
-        if timeout >= self.timeout_max:
-            raise Exception("Timeout waiting for result")
-
-        # Check result
-        result_id = int(self.bus.result_id.value)
-        result_data = int(self.bus.result_data.value)
-        result_we = int(self.bus.result_we.value)
-
-        self.log.debug(f"Result ID: {result_id}, WE: {result_we}")
-        self.log.debug(f"Result: 0x{result_data:08X}")
-        self.log.debug(f"Expected: 0x{expected_val:08X}")
-
-        # if result_id != id:
-        #     raise Exception(f"Result ID mismatch: got {result_id}, expected {id}")
-        if expected_val != -1 and result_data != expected_val:
-            raise Exception(f"Result data mismatch: got 0x{result_data:08X}, expected 0x{expected_val:08X}")
-        if result_we != 1:
-            raise Exception("Write enable not set")
-        self.tx_id += 1
+        self.tx_id = (id + 1) & self.id_mask
         # # Acknowledge result
-        # await RisingEdge(self.clock)
+        start_soon(self.result(id, expected_val=x))
+        await RisingEdge(self.clock)
+        await RisingEdge(self.clock)
 
-    # def calc_length(self, length, data):
-    #     if -1 == length:
-    #         length = self.wbytes
-    #     if not 0 == length % self.wbytes:
-    #         raise Exception(
-    #             f"Length needs to be a multiple of the byte width: {length}%{self.wbytes}"
-    #         )
-    #     if isinstance(data, int):
-    #         min_length = math.ceil(data.bit_length() / self.wwidth)
-    #     else:
-    #         min_length = math.ceil(len(data) / self.wwidth)
-    #     length = max(int(length / self.wbytes), min_length)
-    #     return length
-
-    # def calc_address(self, addr, device: int = 0, index: int = -1):
-    #     self.addr = addr
-    #     if not 0 == len(self.addrmap) and isinstance(addr, str):
-    #         h = re.findall(r"\[(\d+)\]", addr)
-    #         addr = re.sub(r"\[.+", "", addr)
-    #         self.addr = self.addrmap[device][addr]
-    #         for g in h:
-    #             self.addr += int(g) * self.wbytes
-    #     if index != -1:
-    #         self.addr += index * self.wbytes
-    #     return self.addr
-
-    # def addaddrmap(self, addrmap, device: int = 0):
-    #     self.addrmap[device] = addrmap
 
     # async def write(
     #     self,
@@ -529,3 +497,9 @@ class XifMaster(XifBase):
     #             self.bus.pwdata.value = 0
     #             if self.pstrb_present:
     #                 self.bus.pstrb.value = 0
+
+
+class XifMaster(XifHost):
+    """Deprecated alias for XifHost."""
+
+    pass

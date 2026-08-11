@@ -1,0 +1,7 @@
+cocotb
+cocotb-test
+pytest
+pyflakes
+ruff
+mypy
+pre-commit

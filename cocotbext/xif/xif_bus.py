@@ -1,4 +1,4 @@
-from cocotb_bus.bus import Bus
+from .bus import Bus
 
 
 class XifBus(Bus):

@@ -25,9 +25,9 @@ THE SOFTWARE.
 from .version import __version__
 
 from .xif_bus import XifBus
-from .xif_master import XifMaster
+from .xif_host import XifHost, XifMaster
 from .xif_monitor import XifMonitor
-from .xif_slave import XifSlave
+from .xif_device import XifDevice, XifSlave
 from .xif_ram import XifRam
 
 from .constants import XifProt
@@ -43,8 +43,10 @@ __all__ = [
     "Xif3Bus",
     "Xif4Bus",
     "Xif5Bus",
+    "XifHost",
     "XifMaster",
     "XifMonitor",
+    "XifDevice",
     "XifSlave",
     "XifRam",
     "XifProt",

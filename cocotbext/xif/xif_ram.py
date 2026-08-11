@@ -22,11 +22,11 @@ THE SOFTWARE.
 
 """
 
-from .xif_slave import XifSlave
+from .xif_device import XifDevice
 from .memory import Memory
 
 
-class XifRam(XifSlave, Memory):
+class XifRam(XifDevice, Memory):
     def __init__(
         self,
         bus,
@@ -38,7 +38,7 @@ class XifRam(XifSlave, Memory):
         **kwargs
     ):
         Memory.__init__(self, size, mem, **kwargs)
-        XifSlave.__init__(self, bus, clock, **kwargs)
+        XifDevice.__init__(self, bus, clock, **kwargs)
 
     async def _write(self, address, data, strb=None, prot=None):
         self.check_permission(address, prot)

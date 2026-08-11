@@ -50,9 +50,9 @@ class XifBase:
         #     self.multi_device = True
         # self.byte_size = 8
         # self.address_width = len(self.bus.paddr)
-        # self.wwidth = len(self.bus.pwdata)
+        self.id_width = len(self.bus.issue_req_id)
         # self.wbytes = int(self.wwidth / 8)
-        # self.wdata_mask = 2**self.wwidth - 1
+        self.id_mask = 2**self.id_width - 1
         # self.byte_lanes = self.wwidth // self.byte_size
         # self.strb_mask = 2**self.byte_lanes - 1
         # self.rwidth = []

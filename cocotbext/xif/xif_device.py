@@ -38,9 +38,9 @@ class InvalidAccess(Exception):
     pass
 
 
-class XifSlave(XifBase):
+class XifDevice(XifBase):
     def __init__(self, bus, clock, target=None, **kwargs):
-        super().__init__(bus, clock, name="slave", **kwargs)
+        super().__init__(bus, clock, name="device", **kwargs)
         #         self.reset = reset
         self.target = target
         self.privileged_addrs = []
@@ -154,3 +154,9 @@ class XifSlave(XifBase):
                 self.bus.prdata.value = 0
                 if self.pslverr_present:
                     self.bus.pslverr.value = 0
+
+
+class XifSlave(XifDevice):
+    """Deprecated alias for XifDevice."""
+
+    pass
