@@ -1,116 +1,4 @@
-module fifo_v3_3D767_B7BA8 (
-	clk_i,
-	rst_ni,
-	flush_i,
-	testmode_i,
-	full_o,
-	empty_o,
-	usage_o,
-	data_i,
-	push_i,
-	data_o,
-	pop_i
-);
-	parameter signed [31:0] dtype_T_xif_copro_pkg_XLEN = 0;
-	parameter signed [31:0] dtype_T_xif_copro_pkg_X_ID_WIDTH = 0;
-	parameter signed [31:0] dtype_T_xif_copro_pkg_X_RFW_WIDTH = 0;
-	reg _sv2v_0;
-	parameter [0:0] FALL_THROUGH = 1'b0;
-	parameter [31:0] DATA_WIDTH = 32;
-	parameter [31:0] DEPTH = 8;
-	parameter [31:0] ADDR_DEPTH = (DEPTH > 1 ? $clog2(DEPTH) : 1);
-	input wire clk_i;
-	input wire rst_ni;
-	input wire flush_i;
-	input wire testmode_i;
-	output wire full_o;
-	output wire empty_o;
-	output wire [ADDR_DEPTH - 1:0] usage_o;
-	input wire [(((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17:0] data_i;
-	input wire push_i;
-	output reg [(((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17:0] data_o;
-	input wire pop_i;
-	localparam [31:0] FifoDepth = (DEPTH > 0 ? DEPTH : 1);
-	reg gate_clock;
-	reg [ADDR_DEPTH - 1:0] read_pointer_n;
-	reg [ADDR_DEPTH - 1:0] read_pointer_q;
-	reg [ADDR_DEPTH - 1:0] write_pointer_n;
-	reg [ADDR_DEPTH - 1:0] write_pointer_q;
-	reg [ADDR_DEPTH:0] status_cnt_n;
-	reg [ADDR_DEPTH:0] status_cnt_q;
-	reg [(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (FifoDepth * ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18)) - 1 : (FifoDepth * (1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))) + ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 16)):(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)] mem_n;
-	reg [(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (FifoDepth * ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18)) - 1 : (FifoDepth * (1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))) + ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 16)):(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)] mem_q;
-	assign usage_o = status_cnt_q[ADDR_DEPTH - 1:0];
-	generate
-		if (DEPTH == 0) begin : gen_pass_through
-			assign empty_o = ~push_i;
-			assign full_o = ~pop_i;
-		end
-		else begin : gen_fifo
-			assign full_o = status_cnt_q == FifoDepth[ADDR_DEPTH:0];
-			assign empty_o = (status_cnt_q == 0) & ~(FALL_THROUGH & push_i);
-		end
-	endgenerate
-	always @(*) begin : read_write_comb
-		if (_sv2v_0)
-			;
-		read_pointer_n = read_pointer_q;
-		write_pointer_n = write_pointer_q;
-		status_cnt_n = status_cnt_q;
-		data_o = (DEPTH == 0 ? data_i : mem_q[(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) + (read_pointer_q * (((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)))+:(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))]);
-		mem_n = mem_q;
-		gate_clock = 1'b1;
-		if (push_i && ~full_o) begin
-			mem_n[(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) + (write_pointer_q * (((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)))+:(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))] = data_i;
-			gate_clock = 1'b0;
-			if (write_pointer_q == (FifoDepth[ADDR_DEPTH - 1:0] - 1))
-				write_pointer_n = 1'sb0;
-			else
-				write_pointer_n = write_pointer_q + 1;
-			status_cnt_n = status_cnt_q + 1;
-		end
-		if (pop_i && ~empty_o) begin
-			if (read_pointer_n == (FifoDepth[ADDR_DEPTH - 1:0] - 1))
-				read_pointer_n = 1'sb0;
-			else
-				read_pointer_n = read_pointer_q + 1;
-			status_cnt_n = status_cnt_q - 1;
-		end
-		if (((push_i && pop_i) && ~full_o) && ~empty_o)
-			status_cnt_n = status_cnt_q;
-		if ((FALL_THROUGH && (status_cnt_q == 0)) && push_i) begin
-			data_o = data_i;
-			if (pop_i) begin
-				status_cnt_n = status_cnt_q;
-				read_pointer_n = read_pointer_q;
-				write_pointer_n = write_pointer_q;
-			end
-		end
-	end
-	always @(posedge clk_i or negedge rst_ni)
-		if (~rst_ni) begin
-			read_pointer_q <= 1'sb0;
-			write_pointer_q <= 1'sb0;
-			status_cnt_q <= 1'sb0;
-		end
-		else if (flush_i) begin
-			read_pointer_q <= 1'sb0;
-			write_pointer_q <= 1'sb0;
-			status_cnt_q <= 1'sb0;
-		end
-		else begin
-			read_pointer_q <= read_pointer_n;
-			write_pointer_q <= write_pointer_n;
-			status_cnt_q <= status_cnt_n;
-		end
-	always @(posedge clk_i or negedge rst_ni)
-		if (~rst_ni)
-			mem_q <= 1'sb0;
-		else if (!gate_clock)
-			mem_q <= mem_n;
-	initial _sv2v_0 = 0;
-endmodule
-module fifo_v3_B168A_14964 (
+module fifo_v3_21988_707D9 (
 	clk_i,
 	rst_ni,
 	flush_i,
@@ -222,7 +110,119 @@ module fifo_v3_B168A_14964 (
 			mem_q <= mem_n;
 	initial _sv2v_0 = 0;
 endmodule
-module fifo_v3_E08E6_DF286 (
+module fifo_v3_F3A63_49266 (
+	clk_i,
+	rst_ni,
+	flush_i,
+	testmode_i,
+	full_o,
+	empty_o,
+	usage_o,
+	data_i,
+	push_i,
+	data_o,
+	pop_i
+);
+	parameter signed [31:0] dtype_T_xif_copro_pkg_XLEN = 0;
+	parameter signed [31:0] dtype_T_xif_copro_pkg_X_ID_WIDTH = 0;
+	parameter signed [31:0] dtype_T_xif_copro_pkg_X_RFW_WIDTH = 0;
+	reg _sv2v_0;
+	parameter [0:0] FALL_THROUGH = 1'b0;
+	parameter [31:0] DATA_WIDTH = 32;
+	parameter [31:0] DEPTH = 8;
+	parameter [31:0] ADDR_DEPTH = (DEPTH > 1 ? $clog2(DEPTH) : 1);
+	input wire clk_i;
+	input wire rst_ni;
+	input wire flush_i;
+	input wire testmode_i;
+	output wire full_o;
+	output wire empty_o;
+	output wire [ADDR_DEPTH - 1:0] usage_o;
+	input wire [(((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17:0] data_i;
+	input wire push_i;
+	output reg [(((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17:0] data_o;
+	input wire pop_i;
+	localparam [31:0] FifoDepth = (DEPTH > 0 ? DEPTH : 1);
+	reg gate_clock;
+	reg [ADDR_DEPTH - 1:0] read_pointer_n;
+	reg [ADDR_DEPTH - 1:0] read_pointer_q;
+	reg [ADDR_DEPTH - 1:0] write_pointer_n;
+	reg [ADDR_DEPTH - 1:0] write_pointer_q;
+	reg [ADDR_DEPTH:0] status_cnt_n;
+	reg [ADDR_DEPTH:0] status_cnt_q;
+	reg [(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (FifoDepth * ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18)) - 1 : (FifoDepth * (1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))) + ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 16)):(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)] mem_n;
+	reg [(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (FifoDepth * ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18)) - 1 : (FifoDepth * (1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))) + ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 16)):(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)] mem_q;
+	assign usage_o = status_cnt_q[ADDR_DEPTH - 1:0];
+	generate
+		if (DEPTH == 0) begin : gen_pass_through
+			assign empty_o = ~push_i;
+			assign full_o = ~pop_i;
+		end
+		else begin : gen_fifo
+			assign full_o = status_cnt_q == FifoDepth[ADDR_DEPTH:0];
+			assign empty_o = (status_cnt_q == 0) & ~(FALL_THROUGH & push_i);
+		end
+	endgenerate
+	always @(*) begin : read_write_comb
+		if (_sv2v_0)
+			;
+		read_pointer_n = read_pointer_q;
+		write_pointer_n = write_pointer_q;
+		status_cnt_n = status_cnt_q;
+		data_o = (DEPTH == 0 ? data_i : mem_q[(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) + (read_pointer_q * (((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)))+:(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))]);
+		mem_n = mem_q;
+		gate_clock = 1'b1;
+		if (push_i && ~full_o) begin
+			mem_n[(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? 0 : (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) + (write_pointer_q * (((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17)))+:(((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17) >= 0 ? (((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 18 : 1 - ((((dtype_T_xif_copro_pkg_X_ID_WIDTH + dtype_T_xif_copro_pkg_X_RFW_WIDTH) + 5) + (dtype_T_xif_copro_pkg_X_RFW_WIDTH / dtype_T_xif_copro_pkg_XLEN)) + 17))] = data_i;
+			gate_clock = 1'b0;
+			if (write_pointer_q == (FifoDepth[ADDR_DEPTH - 1:0] - 1))
+				write_pointer_n = 1'sb0;
+			else
+				write_pointer_n = write_pointer_q + 1;
+			status_cnt_n = status_cnt_q + 1;
+		end
+		if (pop_i && ~empty_o) begin
+			if (read_pointer_n == (FifoDepth[ADDR_DEPTH - 1:0] - 1))
+				read_pointer_n = 1'sb0;
+			else
+				read_pointer_n = read_pointer_q + 1;
+			status_cnt_n = status_cnt_q - 1;
+		end
+		if (((push_i && pop_i) && ~full_o) && ~empty_o)
+			status_cnt_n = status_cnt_q;
+		if ((FALL_THROUGH && (status_cnt_q == 0)) && push_i) begin
+			data_o = data_i;
+			if (pop_i) begin
+				status_cnt_n = status_cnt_q;
+				read_pointer_n = read_pointer_q;
+				write_pointer_n = write_pointer_q;
+			end
+		end
+	end
+	always @(posedge clk_i or negedge rst_ni)
+		if (~rst_ni) begin
+			read_pointer_q <= 1'sb0;
+			write_pointer_q <= 1'sb0;
+			status_cnt_q <= 1'sb0;
+		end
+		else if (flush_i) begin
+			read_pointer_q <= 1'sb0;
+			write_pointer_q <= 1'sb0;
+			status_cnt_q <= 1'sb0;
+		end
+		else begin
+			read_pointer_q <= read_pointer_n;
+			write_pointer_q <= write_pointer_n;
+			status_cnt_q <= status_cnt_n;
+		end
+	always @(posedge clk_i or negedge rst_ni)
+		if (~rst_ni)
+			mem_q <= 1'sb0;
+		else if (!gate_clock)
+			mem_q <= mem_n;
+	initial _sv2v_0 = 0;
+endmodule
+module fifo_v3_F8A03_07754 (
 	clk_i,
 	rst_ni,
 	flush_i,
@@ -332,63 +332,7 @@ module fifo_v3_E08E6_DF286 (
 			mem_q <= mem_n;
 	initial _sv2v_0 = 0;
 endmodule
-module stream_fifo_472C7_6FB59 (
-	clk_i,
-	rst_ni,
-	flush_i,
-	testmode_i,
-	usage_o,
-	data_i,
-	valid_i,
-	ready_o,
-	data_o,
-	valid_o,
-	ready_i
-);
-	parameter signed [31:0] T_xif_copro_pkg_X_ID_WIDTH = 0;
-	parameter [0:0] FALL_THROUGH = 1'b0;
-	parameter [31:0] DATA_WIDTH = 32;
-	parameter [31:0] DEPTH = 8;
-	parameter [31:0] ADDR_DEPTH = (DEPTH > 1 ? $clog2(DEPTH) : 1);
-	input wire clk_i;
-	input wire rst_ni;
-	input wire flush_i;
-	input wire testmode_i;
-	output wire [ADDR_DEPTH - 1:0] usage_o;
-	input wire [T_xif_copro_pkg_X_ID_WIDTH + 13:0] data_i;
-	input wire valid_i;
-	output wire ready_o;
-	output wire [T_xif_copro_pkg_X_ID_WIDTH + 13:0] data_o;
-	output wire valid_o;
-	input wire ready_i;
-	wire push;
-	wire pop;
-	wire empty;
-	wire full;
-	assign push = valid_i & ~full;
-	assign pop = ready_i & ~empty;
-	assign ready_o = ~full;
-	assign valid_o = ~empty;
-	fifo_v3_E08E6_DF286 #(
-		.dtype_T_xif_copro_pkg_X_ID_WIDTH(T_xif_copro_pkg_X_ID_WIDTH),
-		.FALL_THROUGH(FALL_THROUGH),
-		.DATA_WIDTH(DATA_WIDTH),
-		.DEPTH(DEPTH)
-	) fifo_i(
-		.clk_i(clk_i),
-		.rst_ni(rst_ni),
-		.flush_i(flush_i),
-		.testmode_i(testmode_i),
-		.full_o(full),
-		.empty_o(empty),
-		.usage_o(usage_o),
-		.data_i(data_i),
-		.push_i(push),
-		.data_o(data_o),
-		.pop_i(pop)
-	);
-endmodule
-module stream_fifo_CA27F_66AA4 (
+module stream_fifo_2813C_0BF8F (
 	clk_i,
 	rst_ni,
 	flush_i,
@@ -427,7 +371,7 @@ module stream_fifo_CA27F_66AA4 (
 	assign pop = ready_i & ~empty;
 	assign ready_o = ~full;
 	assign valid_o = ~empty;
-	fifo_v3_3D767_B7BA8 #(
+	fifo_v3_F3A63_49266 #(
 		.dtype_T_xif_copro_pkg_XLEN(T_xif_copro_pkg_XLEN),
 		.dtype_T_xif_copro_pkg_X_ID_WIDTH(T_xif_copro_pkg_X_ID_WIDTH),
 		.dtype_T_xif_copro_pkg_X_RFW_WIDTH(T_xif_copro_pkg_X_RFW_WIDTH),
@@ -448,7 +392,63 @@ module stream_fifo_CA27F_66AA4 (
 		.pop_i(pop)
 	);
 endmodule
-module stream_fifo_EEB9B_DFA55 (
+module stream_fifo_A2C9A_1C15F (
+	clk_i,
+	rst_ni,
+	flush_i,
+	testmode_i,
+	usage_o,
+	data_i,
+	valid_i,
+	ready_o,
+	data_o,
+	valid_o,
+	ready_i
+);
+	parameter signed [31:0] T_xif_copro_pkg_X_ID_WIDTH = 0;
+	parameter [0:0] FALL_THROUGH = 1'b0;
+	parameter [31:0] DATA_WIDTH = 32;
+	parameter [31:0] DEPTH = 8;
+	parameter [31:0] ADDR_DEPTH = (DEPTH > 1 ? $clog2(DEPTH) : 1);
+	input wire clk_i;
+	input wire rst_ni;
+	input wire flush_i;
+	input wire testmode_i;
+	output wire [ADDR_DEPTH - 1:0] usage_o;
+	input wire [T_xif_copro_pkg_X_ID_WIDTH + 13:0] data_i;
+	input wire valid_i;
+	output wire ready_o;
+	output wire [T_xif_copro_pkg_X_ID_WIDTH + 13:0] data_o;
+	output wire valid_o;
+	input wire ready_i;
+	wire push;
+	wire pop;
+	wire empty;
+	wire full;
+	assign push = valid_i & ~full;
+	assign pop = ready_i & ~empty;
+	assign ready_o = ~full;
+	assign valid_o = ~empty;
+	fifo_v3_F8A03_07754 #(
+		.dtype_T_xif_copro_pkg_X_ID_WIDTH(T_xif_copro_pkg_X_ID_WIDTH),
+		.FALL_THROUGH(FALL_THROUGH),
+		.DATA_WIDTH(DATA_WIDTH),
+		.DEPTH(DEPTH)
+	) fifo_i(
+		.clk_i(clk_i),
+		.rst_ni(rst_ni),
+		.flush_i(flush_i),
+		.testmode_i(testmode_i),
+		.full_o(full),
+		.empty_o(empty),
+		.usage_o(usage_o),
+		.data_i(data_i),
+		.push_i(push),
+		.data_o(data_o),
+		.pop_i(pop)
+	);
+endmodule
+module stream_fifo_ADB37_68301 (
 	clk_i,
 	rst_ni,
 	flush_i,
@@ -487,7 +487,7 @@ module stream_fifo_EEB9B_DFA55 (
 	assign pop = ready_i & ~empty;
 	assign ready_o = ~full;
 	assign valid_o = ~empty;
-	fifo_v3_B168A_14964 #(
+	fifo_v3_21988_707D9 #(
 		.dtype_T_xif_copro_pkg_X_ID_WIDTH(T_xif_copro_pkg_X_ID_WIDTH),
 		.dtype_T_xif_copro_pkg_X_NUM_RS(T_xif_copro_pkg_X_NUM_RS),
 		.dtype_T_xif_copro_pkg_X_RFR_WIDTH(T_xif_copro_pkg_X_RFR_WIDTH),
@@ -519,14 +519,14 @@ module xif_copro_decoder (
 	localparam [31:0] xif_copro_pkg_COPRO_OPERATION_BITS = 1;
 	output reg [8:0] decoder_o;
 	localparam [31:0] xif_copro_instr_pkg_BITREV = 32'b0000010zzzzzzzzzz111zzzzz0101011;
-	function automatic [0:0] sv2v_cast_B7EFA;
+	function automatic [0:0] sv2v_cast_E31C5;
 		input reg [0:0] inp;
-		sv2v_cast_B7EFA = inp;
+		sv2v_cast_E31C5 = inp;
 	endfunction
 	always @(*) begin
 		if (_sv2v_0)
 			;
-		decoder_o[8-:1] = sv2v_cast_B7EFA(0);
+		decoder_o[8-:1] = sv2v_cast_E31C5(0);
 		decoder_o[2] = 1'b1;
 		decoder_o[4+:2] = 2'd0;
 		decoder_o[6+:2] = 2'd0;
@@ -536,7 +536,7 @@ module xif_copro_decoder (
 		(* full_case, parallel_case *)
 		casez (instr_i)
 			xif_copro_instr_pkg_BITREV: begin
-				decoder_o[8-:1] = sv2v_cast_B7EFA(1);
+				decoder_o[8-:1] = sv2v_cast_E31C5(1);
 				decoder_o[4+:2] = 2'd3;
 			end
 			default: decoder_o[2] = 1'b0;
@@ -544,7 +544,7 @@ module xif_copro_decoder (
 	end
 	initial _sv2v_0 = 0;
 endmodule
-module xif_copro_ex_stage_099A7_F3EC5 (
+module xif_copro_ex_stage_064DA_4DB4B (
 	clk_i,
 	rst_ni,
 	operand_a_i,
@@ -583,15 +583,15 @@ module xif_copro_ex_stage_099A7_F3EC5 (
 	wire output_hs;
 	assign input_hs = in_valid_i & in_ready_o;
 	assign output_hs = out_valid_o & out_ready_i;
-	function automatic [0:0] sv2v_cast_B7EFA;
+	function automatic [0:0] sv2v_cast_E31C5;
 		input reg [0:0] inp;
-		sv2v_cast_B7EFA = inp;
+		sv2v_cast_E31C5 = inp;
 	endfunction
 	always @(*) begin
 		if (_sv2v_0)
 			;
 		case (operator)
-			sv2v_cast_B7EFA(1): begin
+			sv2v_cast_E31C5(1): begin
 				bitrev_result = 1'sb0;
 				begin : sv2v_autoblock_1
 					reg signed [31:0] i;
@@ -608,7 +608,7 @@ module xif_copro_ex_stage_099A7_F3EC5 (
 		result_o = 1'sb0;
 		(* full_case, parallel_case *)
 		case (operator)
-			sv2v_cast_B7EFA(1): result_o = bitrev_result;
+			sv2v_cast_E31C5(1): result_o = bitrev_result;
 			default:
 				;
 		endcase
@@ -630,7 +630,7 @@ module xif_copro_ex_stage_099A7_F3EC5 (
 		if (~rst_ni) begin
 			operand_a <= 1'sb0;
 			operand_b <= 1'sb0;
-			operator <= sv2v_cast_B7EFA(0);
+			operator <= sv2v_cast_E31C5(0);
 			tag_o <= 1'sb0;
 		end
 		else if (input_hs) begin
@@ -642,7 +642,7 @@ module xif_copro_ex_stage_099A7_F3EC5 (
 		else if (output_hs) begin
 			operand_a <= 1'sb0;
 			operand_b <= 1'sb0;
-			operator <= sv2v_cast_B7EFA(0);
+			operator <= sv2v_cast_E31C5(0);
 			tag_o <= 1'sb0;
 		end
 	end
@@ -651,7 +651,7 @@ module xif_copro_ex_stage_099A7_F3EC5 (
 			;
 		latency_d = 4'b0000;
 		case (operator)
-			sv2v_cast_B7EFA(1): latency_d = 4'b0000;
+			sv2v_cast_E31C5(1): latency_d = 4'b0000;
 			default:
 				;
 		endcase
@@ -678,15 +678,15 @@ module xif_copro_predecoder (
 	wire [4:0] instr_rsp;
 	wire [0:0] instr_sel;
 	genvar _gv_i_1;
-	function automatic [1:0] sv2v_cast_8E8B9;
+	function automatic [1:0] sv2v_cast_F51F8;
 		input reg [1:0] inp;
-		sv2v_cast_8E8B9 = inp;
+		sv2v_cast_F51F8 = inp;
 	endfunction
 	function automatic [4:0] sv2v_cast_5;
 		input reg [4:0] inp;
 		sv2v_cast_5 = inp;
 	endfunction
-	localparam [68:0] xif_copro_predecoder_pkg_OFFLOAD_INSTR = {64'b0000010000000000011100000010101111111110000000000111000001111111, sv2v_cast_5({3'b100, sv2v_cast_8E8B9(2'b01)})};
+	localparam [68:0] xif_copro_predecoder_pkg_OFFLOAD_INSTR = {64'b0000010000000000011100000010101111111110000000000111000001111111, sv2v_cast_5({3'b100, sv2v_cast_F51F8(2'b01)})};
 	generate
 		for (_gv_i_1 = 0; _gv_i_1 < xif_copro_predecoder_pkg_NUM_INSTR; _gv_i_1 = _gv_i_1 + 1) begin : gen_predecoder_selector
 			localparam i = _gv_i_1;
@@ -763,13 +763,13 @@ module xif_copro_regfile (
 				end
 		end
 	end
-	function automatic [DATA_WIDTH - 1:0] sv2v_cast_C274E;
+	function automatic [DATA_WIDTH - 1:0] sv2v_cast_DD703;
 		input reg [DATA_WIDTH - 1:0] inp;
-		sv2v_cast_C274E = inp;
+		sv2v_cast_DD703 = inp;
 	endfunction
 	always @(posedge clk_i or negedge rst_ni) begin : register_write_behavioral
 		if (~rst_ni)
-			mem <= {NUM_WORDS {sv2v_cast_C274E(1'sb0)}};
+			mem <= {NUM_WORDS {sv2v_cast_DD703(1'sb0)}};
 		else begin : sv2v_autoblock_3
 			reg [31:0] j;
 			for (j = 0; j < NR_WRITE_PORTS; j = j + 1)
@@ -972,14 +972,14 @@ module xif_copro_wrapper (
 	assign s_xif_result_exccode = ext_if.result[7-:6];
 	assign ext_if.compressed_valid = s_xif_compressed_valid;
 	assign ext_if.compressed_req = s_xif_compressed_req;
-	localparam _param_67078_INPUT_BUFFER_DEPTH = 1;
-	localparam _param_67078_FORWARDING = 1;
+	localparam _param_C0024_INPUT_BUFFER_DEPTH = 1;
+	localparam _param_C0024_FORWARDING = 1;
 	generate
 		if (1) begin : xif_copro_i
 			reg _sv2v_0;
 			localparam [31:0] XLEN = 32;
-			localparam [31:0] INPUT_BUFFER_DEPTH = _param_67078_INPUT_BUFFER_DEPTH;
-			localparam [0:0] FORWARDING = _param_67078_FORWARDING;
+			localparam [31:0] INPUT_BUFFER_DEPTH = _param_C0024_INPUT_BUFFER_DEPTH;
+			localparam [0:0] FORWARDING = _param_C0024_FORWARDING;
 			wire clk_i;
 			wire rst_ni;
 			wire [31:0] prd_req;
@@ -1047,7 +1047,7 @@ module xif_copro_wrapper (
 			assign in_buf_push_data[37-:32] = xif_copro_wrapper.ext_if.issue_req[38 + ((32'sd2 * 32'sd32) + 8)-:((38 + ((32'sd2 * 32'sd32) + 8)) >= (6 + ((32'sd2 * 32'sd32) + 9)) ? ((38 + ((32'sd2 * 32'sd32) + 8)) - (6 + ((32'sd2 * 32'sd32) + 9))) + 1 : ((6 + ((32'sd2 * 32'sd32) + 9)) - (38 + ((32'sd2 * 32'sd32) + 8))) + 1)];
 			assign in_buf_push_data[5-:4] = xif_copro_wrapper.ext_if.issue_req[32'sd4 + ((32'sd2 * 32'sd32) + 8)-:((32'sd4 + ((32'sd2 * 32'sd32) + 8)) >= ((32'sd2 * 32'sd32) + 9) ? ((32'sd4 + ((32'sd2 * 32'sd32) + 8)) - ((32'sd2 * 32'sd32) + 9)) + 1 : (((32'sd2 * 32'sd32) + 9) - (32'sd4 + ((32'sd2 * 32'sd32) + 8))) + 1)];
 			assign in_buf_push_data[1-:2] = xif_copro_wrapper.ext_if.issue_req[6 + ((32'sd2 * 32'sd32) + 8)-:((6 + ((32'sd2 * 32'sd32) + 8)) >= (32'sd4 + ((32'sd2 * 32'sd32) + 9)) ? ((6 + ((32'sd2 * 32'sd32) + 8)) - (32'sd4 + ((32'sd2 * 32'sd32) + 9))) + 1 : ((32'sd4 + ((32'sd2 * 32'sd32) + 9)) - (6 + ((32'sd2 * 32'sd32) + 8))) + 1)];
-			stream_fifo_EEB9B_DFA55 #(
+			stream_fifo_ADB37_68301 #(
 				.T_xif_copro_pkg_X_ID_WIDTH(xif_copro_pkg_X_ID_WIDTH),
 				.T_xif_copro_pkg_X_NUM_RS(xif_copro_pkg_X_NUM_RS),
 				.T_xif_copro_pkg_X_RFR_WIDTH(xif_copro_pkg_X_RFR_WIDTH),
@@ -1067,27 +1067,27 @@ module xif_copro_wrapper (
 				.valid_o(in_buf_pop_valid),
 				.ready_i(in_buf_pop_ready)
 			);
-			wire [4:1] sv2v_tmp_35B50;
-			assign sv2v_tmp_35B50 = in_buf_pop_data[5-:4];
-			always @(*) xif_copro_wrapper.ext_if.mem_req[81-:4] = sv2v_tmp_35B50;
-			wire [2:1] sv2v_tmp_B2794;
-			assign sv2v_tmp_B2794 = in_buf_pop_data[1-:2];
-			always @(*) xif_copro_wrapper.ext_if.mem_req[45-:2] = sv2v_tmp_B2794;
-			wire [3:1] sv2v_tmp_460E6;
-			assign sv2v_tmp_460E6 = 3'b010;
-			always @(*) xif_copro_wrapper.ext_if.mem_req[42-:3] = sv2v_tmp_460E6;
-			wire [4:1] sv2v_tmp_C852C;
-			assign sv2v_tmp_C852C = 1'sb1;
-			always @(*) xif_copro_wrapper.ext_if.mem_req[39-:4] = sv2v_tmp_C852C;
-			wire [2:1] sv2v_tmp_61F67;
-			assign sv2v_tmp_61F67 = 2'b00;
-			always @(*) xif_copro_wrapper.ext_if.mem_req[35-:2] = sv2v_tmp_61F67;
-			wire [1:1] sv2v_tmp_7B270;
-			assign sv2v_tmp_7B270 = 1'b1;
-			always @(*) xif_copro_wrapper.ext_if.mem_req[1] = sv2v_tmp_7B270;
-			wire [1:1] sv2v_tmp_97BD0;
-			assign sv2v_tmp_97BD0 = 1'b0;
-			always @(*) xif_copro_wrapper.ext_if.mem_req[0] = sv2v_tmp_97BD0;
+			wire [4:1] sv2v_tmp_C0E3F;
+			assign sv2v_tmp_C0E3F = in_buf_pop_data[5-:4];
+			always @(*) xif_copro_wrapper.ext_if.mem_req[81-:4] = sv2v_tmp_C0E3F;
+			wire [2:1] sv2v_tmp_D01DE;
+			assign sv2v_tmp_D01DE = in_buf_pop_data[1-:2];
+			always @(*) xif_copro_wrapper.ext_if.mem_req[45-:2] = sv2v_tmp_D01DE;
+			wire [3:1] sv2v_tmp_59F54;
+			assign sv2v_tmp_59F54 = 3'b010;
+			always @(*) xif_copro_wrapper.ext_if.mem_req[42-:3] = sv2v_tmp_59F54;
+			wire [4:1] sv2v_tmp_53521;
+			assign sv2v_tmp_53521 = 1'sb1;
+			always @(*) xif_copro_wrapper.ext_if.mem_req[39-:4] = sv2v_tmp_53521;
+			wire [2:1] sv2v_tmp_D0ACF;
+			assign sv2v_tmp_D0ACF = 2'b00;
+			always @(*) xif_copro_wrapper.ext_if.mem_req[35-:2] = sv2v_tmp_D0ACF;
+			wire [1:1] sv2v_tmp_EE92C;
+			assign sv2v_tmp_EE92C = 1'b1;
+			always @(*) xif_copro_wrapper.ext_if.mem_req[1] = sv2v_tmp_EE92C;
+			wire [1:1] sv2v_tmp_D2FD0;
+			assign sv2v_tmp_D2FD0 = 1'b0;
+			always @(*) xif_copro_wrapper.ext_if.mem_req[0] = sv2v_tmp_D2FD0;
 			always @(*) begin
 				if (_sv2v_0)
 					;
@@ -1113,7 +1113,7 @@ module xif_copro_wrapper (
 			assign mem_push_data[7] = xif_copro_wrapper.ext_if.mem_resp[7];
 			assign mem_push_data[6-:6] = xif_copro_wrapper.ext_if.mem_resp[6-:6];
 			assign mem_push_data[0] = xif_copro_wrapper.ext_if.mem_resp[0];
-			stream_fifo_472C7_6FB59 #(
+			stream_fifo_A2C9A_1C15F #(
 				.T_xif_copro_pkg_X_ID_WIDTH(xif_copro_pkg_X_ID_WIDTH),
 				.FALL_THROUGH(0),
 				.DATA_WIDTH(XLEN),
@@ -1131,10 +1131,10 @@ module xif_copro_wrapper (
 				.valid_o(),
 				.ready_i(mem_pop_ready)
 			);
-			localparam _param_4C847_FORWARDING = FORWARDING;
+			localparam _param_3C587_FORWARDING = FORWARDING;
 			if (1) begin : xif_copro_controller_i
 				reg _sv2v_0;
-				localparam [0:0] FORWARDING = _param_4C847_FORWARDING;
+				localparam [0:0] FORWARDING = _param_3C587_FORWARDING;
 				wire clk_i;
 				wire rst_ni;
 				localparam signed [31:0] xif_copro_pkg_X_NUM_RS = 2;
@@ -1304,9 +1304,9 @@ module xif_copro_wrapper (
 			assign xif_copro_controller_i.is_store_i = decoded_data[1];
 			assign xif_copro_wrapper.ext_if.mem_valid = xif_copro_controller_i.xif_mem_valid_o;
 			assign xif_copro_controller_i.xif_mem_ready_i = xif_copro_wrapper.ext_if.mem_ready;
-			wire [1:1] sv2v_tmp_58792;
-			assign sv2v_tmp_58792 = xif_copro_controller_i.xif_mem_req_we_o;
-			always @(*) xif_copro_wrapper.ext_if.mem_req[43] = sv2v_tmp_58792;
+			wire [1:1] sv2v_tmp_03047;
+			assign sv2v_tmp_03047 = xif_copro_controller_i.xif_mem_req_we_o;
+			always @(*) xif_copro_wrapper.ext_if.mem_req[43] = sv2v_tmp_03047;
 			assign xif_copro_controller_i.xif_mem_req_id_i = xif_copro_wrapper.ext_if.mem_req[81-:4];
 			assign mem_push_valid = xif_copro_controller_i.mem_push_valid_o;
 			assign xif_copro_controller_i.mem_push_ready_i = mem_push_ready;
@@ -1388,7 +1388,7 @@ module xif_copro_wrapper (
 			assign ex_tag_in[5-:5] = in_buf_pop_data[17:13];
 			assign ex_tag_in[0] = decoded_data[3];
 			assign ex_tag_in[9-:4] = in_buf_pop_data[5-:4];
-			xif_copro_ex_stage_099A7_F3EC5 #(
+			xif_copro_ex_stage_064DA_4DB4B #(
 				.tag_t_xif_copro_pkg_X_ID_WIDTH(xif_copro_pkg_X_ID_WIDTH),
 				.XLEN(XLEN)
 			) xif_copro_ex_stage_i(
@@ -1405,27 +1405,27 @@ module xif_copro_wrapper (
 				.tag_o(ex_tag_out),
 				.result_o(data_result)
 			);
-			wire [((41 + ((32'sd32 / 32'sd32) + 17)) >= (37 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)))) + 1 : ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) - (xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))))) + 1) * 1:1] sv2v_tmp_D9766;
-			assign sv2v_tmp_D9766 = (xif_copro_wrapper.ext_if.mem_result_valid ? mem_pop_data[17-:4] : ex_tag_out[9-:4]);
-			always @(*) result_push_data[xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))-:((41 + ((32'sd32 / 32'sd32) + 17)) >= (37 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)))) + 1 : ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) - (xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))))) + 1)] = sv2v_tmp_D9766;
-			wire [((37 + ((32'sd32 / 32'sd32) + 17)) >= (5 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) + 1 : ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) + 1) * 1:1] sv2v_tmp_CD9AF;
-			assign sv2v_tmp_CD9AF = data_result;
-			always @(*) result_push_data[xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))-:((37 + ((32'sd32 / 32'sd32) + 17)) >= (5 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) + 1 : ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) + 1)] = sv2v_tmp_CD9AF;
-			wire [((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) >= ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) ? ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) - ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) + 1 : (((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) + 1) * 1:1] sv2v_tmp_B401B;
-			assign sv2v_tmp_B401B = ex_tag_out[5-:5];
-			always @(*) result_push_data[5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)-:((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) >= ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) ? ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) - ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) + 1 : (((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) + 1)] = sv2v_tmp_B401B;
-			wire [1:1] sv2v_tmp_D507F;
-			assign sv2v_tmp_D507F = mem_pop_data[7];
-			always @(*) result_push_data[8] = sv2v_tmp_D507F;
-			wire [6:1] sv2v_tmp_9516F;
-			assign sv2v_tmp_9516F = mem_pop_data[6-:6];
-			always @(*) result_push_data[7-:6] = sv2v_tmp_9516F;
-			wire [1:1] sv2v_tmp_B8EAD;
-			assign sv2v_tmp_B8EAD = mem_pop_data[0] | (xif_copro_wrapper.ext_if.mem_result_valid & xif_copro_wrapper.ext_if.mem_result[0]);
-			always @(*) result_push_data[0] = sv2v_tmp_B8EAD;
-			wire [1:1] sv2v_tmp_3E728;
-			assign sv2v_tmp_3E728 = xif_copro_wrapper.ext_if.mem_result_valid & xif_copro_wrapper.ext_if.mem_result[1];
-			always @(*) result_push_data[1] = sv2v_tmp_3E728;
+			wire [((41 + ((32'sd32 / 32'sd32) + 17)) >= (37 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)))) + 1 : ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) - (xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))))) + 1) * 1:1] sv2v_tmp_BF766;
+			assign sv2v_tmp_BF766 = (xif_copro_wrapper.ext_if.mem_result_valid ? mem_pop_data[17-:4] : ex_tag_out[9-:4]);
+			always @(*) result_push_data[xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))-:((41 + ((32'sd32 / 32'sd32) + 17)) >= (37 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)))) + 1 : ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) - (xif_copro_pkg_X_ID_WIDTH + (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))))) + 1)] = sv2v_tmp_BF766;
+			wire [((37 + ((32'sd32 / 32'sd32) + 17)) >= (5 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) + 1 : ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) + 1) * 1:1] sv2v_tmp_30A5E;
+			assign sv2v_tmp_30A5E = data_result;
+			always @(*) result_push_data[xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))-:((37 + ((32'sd32 / 32'sd32) + 17)) >= (5 + ((32'sd32 / 32'sd32) + 18)) ? ((xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18))) + 1 : ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) - (xif_copro_pkg_X_RFW_WIDTH + (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)))) + 1)] = sv2v_tmp_30A5E;
+			wire [((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) >= ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) ? ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) - ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) + 1 : (((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) + 1) * 1:1] sv2v_tmp_0BB83;
+			assign sv2v_tmp_0BB83 = ex_tag_out[5-:5];
+			always @(*) result_push_data[5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)-:((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) >= ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) ? ((5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17)) - ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18)) + 1 : (((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 18) - (5 + ((xif_copro_pkg_X_RFW_WIDTH / xif_copro_pkg_XLEN) + 17))) + 1)] = sv2v_tmp_0BB83;
+			wire [1:1] sv2v_tmp_6D834;
+			assign sv2v_tmp_6D834 = mem_pop_data[7];
+			always @(*) result_push_data[8] = sv2v_tmp_6D834;
+			wire [6:1] sv2v_tmp_75F82;
+			assign sv2v_tmp_75F82 = mem_pop_data[6-:6];
+			always @(*) result_push_data[7-:6] = sv2v_tmp_75F82;
+			wire [1:1] sv2v_tmp_8A658;
+			assign sv2v_tmp_8A658 = mem_pop_data[0] | (xif_copro_wrapper.ext_if.mem_result_valid & xif_copro_wrapper.ext_if.mem_result[0]);
+			always @(*) result_push_data[0] = sv2v_tmp_8A658;
+			wire [1:1] sv2v_tmp_CA537;
+			assign sv2v_tmp_CA537 = xif_copro_wrapper.ext_if.mem_result_valid & xif_copro_wrapper.ext_if.mem_result[1];
+			always @(*) result_push_data[1] = sv2v_tmp_CA537;
 			always @(*) begin
 				if (_sv2v_0)
 					;
@@ -1443,7 +1443,7 @@ module xif_copro_wrapper (
 					result_push_data[17-:6] = 6'b001100;
 				end
 			end
-			stream_fifo_CA27F_66AA4 #(
+			stream_fifo_2813C_0BF8F #(
 				.T_xif_copro_pkg_XLEN(xif_copro_pkg_XLEN),
 				.T_xif_copro_pkg_X_ID_WIDTH(xif_copro_pkg_X_ID_WIDTH),
 				.T_xif_copro_pkg_X_RFW_WIDTH(xif_copro_pkg_X_RFW_WIDTH),

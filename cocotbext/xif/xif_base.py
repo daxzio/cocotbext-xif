@@ -27,6 +27,7 @@ import logging
 from typing import Any
 
 from .version import __version__
+from .utils import resolve_x_int
 
 
 class XifBase:
@@ -118,5 +119,5 @@ class XifBase:
 
         active = int(self.reset_active_level)
         release_edge = RisingEdge if not self.reset_active_level else FallingEdge
-        while int(self.reset.value) == active:
+        while resolve_x_int(self.reset) == active:
             await release_edge(self.reset)

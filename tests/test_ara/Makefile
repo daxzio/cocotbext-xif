@@ -108,13 +108,16 @@ EXT_VERILOG_SOURCES += \
 	$(ASIC_DIR)/common_cells/mem_to_banks.sv
 
 # ---------- Ara coprocessor RTL (from hierarchy, deduplicated) ----------
+# ara_dispatcher: path factored out so sv2v can use a patched copy (enum .next on
+# type-parameter fields is not yet rewritten by sv2v).
+ARA_DISPATCHER_SRC := $(ASIC_DIR)/ara/hardware/src/ara_dispatcher.sv
 EXT_VERILOG_SOURCES += \
 	$(ASIC_DIR)/ara/hardware/include/rvv_pkg.sv \
 	$(ASIC_DIR)/ara/hardware/include/ara_pkg.sv \
 	$(ASIC_DIR)/ara/hardware/src/segment_sequencer.sv \
 	$(ASIC_DIR)/ara/hardware/src/ctrl_registers.sv \
 	$(ASIC_DIR)/ara/hardware/src/cva6_accel_first_pass_decoder.sv \
-	$(ASIC_DIR)/ara/hardware/src/ara_dispatcher.sv \
+	$(ARA_DISPATCHER_SRC) \
 	$(ASIC_DIR)/ara/hardware/src/ara_sequencer.sv \
 	$(ASIC_DIR)/ara/hardware/src/ara.sv \
 	$(ASIC_DIR)/ara/hardware/src/lane/lane_sequencer.sv \
@@ -162,6 +165,10 @@ IGNORE_ARGS += -Wno-SIDEEFFECT
 # Parallel Verilator C++ build (large speedup). Override with BUILD_ARGS= if needed.
 BUILD_ARGS += -j$(shell nproc 2>/dev/null || echo 8)
 
+# Snapshot full SV lists for sv2v before Icarus replaces them with the flat .v.
+SV2V_EXT_SOURCES := $(EXT_VERILOG_SOURCES)
+SV2V_INT_SOURCES := $(INT_VERILOG_SOURCES)
+
 # Icarus: single .v from sv2v (run "make sv2v" first). Override before include so VERILOG_DESIGN is correct.
 ifeq ($(SIM),icarus)
 INT_VERILOG_SOURCES := ./ara_xif_wrapper.v
@@ -170,25 +177,31 @@ endif
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
 
-# Icarus sim needs ara_xif_wrapper.v; no rule to build it → run "make sv2v" first.
+# Icarus sim needs ara_xif_wrapper.v; rebuild via make sv2v when missing/outdated.
 ifeq ($(SIM),icarus)
 sim_build_icarus/sim.vvp: ara_xif_wrapper.v
 endif
 
-# ARA_SV2V_DEFINES := NR_LANES=2 VLEN=128 ARIANE_ACCELERATOR_PORT=1 COMMON_CELLS_ASSERTS_OFF VERILATOR
-SV2V_STRIP_DPI := $(RTLFLO_PATH)/scripts/strip_dpi_verilog.py
-SV2V_FIX_CONSTFUNC := $(RTLFLO_PATH)/scripts/fix_fpnew_constfunc_verilog.py
-SV2V_FIX_IDX_WIDTH := $(RTLFLO_PATH)/scripts/fix_idx_width_verilog.py
+# Local sv2v with enum-method support (override if needed).
+SV2V ?= /mnt/sda/projects/sv2v/bin/sv2v
 
-sv2v: $(SV2V_STRIP_DPI) $(SV2V_FIX_CONSTFUNC) $(SV2V_FIX_IDX_WIDTH)
-	sv2v \
-        $(addprefix -I, $(VERILOG_INCLUDE_DIRS)) \
-        $(addprefix -D, $(DEFINES)) -DVERILATOR \
-		--top $(TOPLEVEL) $(EXT_VERILOG_SOURCES)  $(INT_VERILOG_SOURCES) \
-        --write=ara_xif_wrapper_temp.v
-	python3 $(SV2V_STRIP_DPI) ara_xif_wrapper_temp.v ara_xif_wrapper.v
-	python3 $(SV2V_FIX_CONSTFUNC) ara_xif_wrapper.v
-	python3 $(SV2V_FIX_IDX_WIDTH) ara_xif_wrapper.v
-	@rm -f ara_xif_wrapper_temp.v 
+# sv2v cannot yet rewrite enum methods on fields of type-parameter types
+# (ara_req_t.emul.next). Use next_lmul(), which matches .next() for legal LMULs.
+ARA_DISPATCHER_SV2V := ara_dispatcher_sv2v.sv
+$(ARA_DISPATCHER_SV2V): $(ARA_DISPATCHER_SRC)
+	sed 's/ara_req\.emul\.next()/next_lmul(ara_req.emul)/g' $< > $@
 
+SV2V_SOURCES := $(patsubst $(ARA_DISPATCHER_SRC),$(ARA_DISPATCHER_SV2V),$(SV2V_EXT_SOURCES) $(SV2V_INT_SOURCES))
+
+sv2v: $(ARA_DISPATCHER_SV2V)
+	$(SV2V) \
+		$(addprefix -I, $(VERILOG_INCLUDE_DIRS)) \
+		$(addprefix -D, $(DEFINES)) -DVERILATOR \
+		--top $(TOPLEVEL) $(SV2V_SOURCES) \
+		--write=ara_xif_wrapper.v
+	python3 post_sv2v_icarus.py ara_xif_wrapper.v
+
+.PHONY: sv2v
+clean::
+	rm -f $(ARA_DISPATCHER_SV2V)
 

@@ -69,18 +69,20 @@ EXT_VERILOG_SOURCES += \
 INT_VERILOG_SOURCES += \
 	./fpu_ss_wrapper.sv
 
+SV2V_EXT_SOURCES := $(EXT_VERILOG_SOURCES)
+SV2V_INT_SOURCES := $(INT_VERILOG_SOURCES)
+
 FPU_SS_SV2V_DEFINES := VERILATOR COMMON_CELLS_ASSERTS_OFF
 
+.PHONY: sv2v
 sv2v:
 	sv2v $(addprefix -I, $(VERILOG_INCLUDE_DIRS)) \
 		$(addprefix -D, $(FPU_SS_SV2V_DEFINES)) \
-		$(EXT_VERILOG_SOURCES) \
-		$(INT_VERILOG_SOURCES) \
+		$(SV2V_EXT_SOURCES) \
+		$(SV2V_INT_SOURCES) \
 		--top $(TOPLEVEL) \
 		--write=$(TOPLEVEL).v
 
-# # ---------- Icarus: use single .v from sv2v; run 'make sv2v' first ----------
-# FPU_SS_SV_FOR_SV2V := $(EXT_VERILOG_SOURCES)
 ifeq ($(SIM),icarus)
 INT_VERILOG_SOURCES := ./fpu_ss_wrapper.v
 EXT_VERILOG_SOURCES :=

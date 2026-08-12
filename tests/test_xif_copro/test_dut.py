@@ -9,12 +9,14 @@ from cocotb.clock import Clock
 
 from cocotbext.xif import XifBus, XifHost, XifMonitor, BitrevEncoder, XifMode
 
+from xif_helpers import init_reset_before_host
+
 
 async def _setup(dut):
     clock = Clock(dut.clk_i, 10, unit="ns")
     cocotb.start_soon(clock.start())
 
-    dut.rst_ni.value = 0
+    init_reset_before_host(dut)
     xif_bus = XifBus.from_prefix(dut, "s_xif")
     host = XifHost(xif_bus, dut.clk_i, reset=dut.rst_ni, reset_active_level=False)
     XifMonitor(xif_bus, dut.clk_i)

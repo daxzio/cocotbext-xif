@@ -163,7 +163,7 @@ make sim SIM=verilator WAVES=0
 |-------|-------------|-----------|--------|
 | `tests/test_xif_copro` | Example XIF coprocessor (bitrev) | Pass | Pass |
 | `tests/test_fpu_ss` | FPU subsystem over XIF | Pass | Pass |
-| `tests/test_ara` | PULP Ara vector unit over XIF | Pass | Fail (compile; use Verilator) |
-| `tests/test_horcrux` | HORCRUX crypto coprocessor over XIF | Pass | — |
+| `tests/test_ara` | PULP Ara vector unit over XIF | Pass | Pass (`make sv2v` first) |
+| `tests/test_horcrux` | HORCRUX crypto coprocessor over XIF | Pass | Pass (`make sv2v` first) |
 
-Icarus runs need a prebuilt Verilog netlist from `make sv2v` where applicable. Prefer `SIM=verilator` for Ara.
+Icarus runs need a prebuilt Verilog netlist from `make sv2v` where applicable.
