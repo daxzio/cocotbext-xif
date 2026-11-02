@@ -165,6 +165,17 @@ IGNORE_ARGS += -Wno-SIDEEFFECT
 # Parallel Verilator C++ build (large speedup). Override with BUILD_ARGS= if needed.
 BUILD_ARGS += -j$(shell nproc 2>/dev/null || echo 8)
 
+# Verilator 5.052 and 5.054 elaborate Ara until ConstVisitor's C stack fills RAM.
+# No %Error, and Vtop.mk is never written. 5.050 finishes at about 1.7 GB.
+# `module load verilator` is 5.054. Detail: VERILATOR-5.052.md.
+VERILATOR_5050_BIN := $(firstword $(wildcard /cadtools/spack-2025/opt/linux-ubuntu24.04-skylake/gcc-13.3.0/verilator/5.050-*/bin))
+ifeq ($(SIM),verilator)
+ifeq ($(strip $(VERILATOR_5050_BIN)),)
+$(error Verilator 5.050 not found under the spack prefix; 5.052 and later OOM on Ara. See VERILATOR-5.052.md)
+endif
+VERILATOR_BIN_DIR := $(VERILATOR_5050_BIN)
+endif
+
 # Snapshot full SV lists for sv2v before Icarus replaces them with the flat .v.
 SV2V_EXT_SOURCES := $(EXT_VERILOG_SOURCES)
 SV2V_INT_SOURCES := $(INT_VERILOG_SOURCES)

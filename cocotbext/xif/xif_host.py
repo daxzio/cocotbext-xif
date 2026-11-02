@@ -334,11 +334,11 @@ class XifHost(XifBase):
         if insn.expected is not None:
             expected = self.mask_x(insn.expected)
             if result.data != expected:
+                width = max(1, self.xlen // 4)
                 raise RuntimeError(
                     f"Result data mismatch for id {insn.id}: "
-                    f"got 0x{result.data:0{width}x}, expected 0x{expected:0{width}x}".format(
-                        width=max(1, self.xlen // 4)
-                    )
+                    f"got 0x{result.data:0{width}x}, "
+                    f"expected 0x{expected:0{width}x}"
                 )
         if insn.check_we and not result.we:
             raise RuntimeError(f"Write enable not set for id {insn.id}")

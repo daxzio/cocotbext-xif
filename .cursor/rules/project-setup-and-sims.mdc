@@ -1,0 +1,49 @@
+---
+description: Project venv setup and simulator status for cocotb tests
+alwaysApply: true
+---
+
+# Project setup and simulators
+
+## Environment
+
+Activate the project venv before install/test work:
+
+```bash
+source ~/.venv/horcrux-3.13.5/bin/activate
+```
+
+Then from the repo root: `pip install -e .` and `pip install -r requirements.txt` as needed.
+Uses Python 3.13, cocotb 2.0.1. Do **not** depend on `cocotb-bus` — `Bus` is vendored at `cocotbext/xif/bus.py` (from cocotb-bus 0.3.0; package deprecated end of 2026).
+
+Public driver/responder names are `XifHost` and `XifDevice`. Do not document legacy aliases (`XifMaster`, `XifSlave`, `XifRam`) in README or user-facing docs.
+
+## API conventions
+
+* Use `XifHost.execute(instr, ...)` for blocking instruction issue + commit + result check.
+* Use `issue_nowait()` / `wait()` for pipelined or multi-outstanding tests.
+* Instruction encoding belongs in encoder classes (`BitrevEncoder`, `FaddSEncoder`, `RvvConfigEncoder`, `HorcruxEncoder`) or test-local modules — not in `XifHost` subclasses.
+* Generic RISC-V field packing: `encode_r`, `encode_r4`, `encode_i` from `cocotbext.xif.riscv`.
+* Before constructing `XifHost`, call `init_reset_before_host(dut)` from `tests/xif_helpers.py` (Icarus leaves reset as `Z` at time 0).
+
+## Existing tests (`tests/`)
+
+Four cocotb suites; run with `make sim SIM=<sim> WAVES=0` from each directory (MODULE=`test_dut`).
+
+| Suite | Verilator | Icarus |
+|-------|-----------|--------|
+| `tests/test_xif_copro` | PASS | PASS |
+| `tests/test_fpu_ss` | PASS | PASS |
+| `tests/test_ara` | PASS on **5.050 only** | PASS (`make sv2v` then `make sim SIM=icarus`) |
+| `tests/test_horcrux` | PASS | PASS (`make sv2v` then `make sim SIM=icarus`) |
+| `tests/test_horcrux_apb` | PASS | PASS (`make sv2v` then `make sim SIM=icarus`; hulkv2 venv) |
+
+Icarus needs a prebuilt `.v` from `make sv2v` in each suite directory.
+
+## Verilator 5.052+ vs Ara
+
+`module load verilator` is **5.054** (2026-11-01). 5.052 fails the same way. Do not use either for `tests/test_ara`.
+
+After the AST is built (~1.6 GB), `ConstVisitor` recurses down a deep expression and the C stack grows until the cgroup or the OOM killer stops `verilator_bin`. No `%Error`, no `Vtop.mk`. 5.050 finishes that elaborate at about 1.7 GB with a 2 MB stack. This is not [#6561](https://github.com/verilator/verilator/issues/6561) and not the DFG passes. Detail: `tests/test_ara/VERILATOR-5.052.md`.
+
+`tests/test_ara/Makefile` pins `VERILATOR_BIN_DIR` to the spack `5.050-*` bin. Do not remove that pin, and do not launch `make sim SIM=verilator` for Ara against 5.052 or 5.054. Keep `WAVES=0`.

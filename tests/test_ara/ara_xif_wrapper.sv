@@ -1,0 +1,108 @@
+// Thin wrapper: XIF at top level, instantiates Ara vector unit (ara_xif_core).
+
+module ara_xif_wrapper #(
+  parameter int unsigned NrLanes = 2,
+  parameter int unsigned VLEN    = 128
+) (
+  input  logic        clk_i,
+  input  logic        rst_ni,
+
+  input  logic        s_xif_issue_valid,
+  input  logic [31:0] s_xif_issue_req_instr,
+  input  logic [1:0]  s_xif_issue_req_mode,
+  input  logic [3:0]  s_xif_issue_req_id,
+  input  logic [31:0] s_xif_issue_req_rs_0,
+  input  logic [31:0] s_xif_issue_req_rs_1,
+  input  logic [31:0] s_xif_issue_req_rs_2,
+  input  logic [2:0]  s_xif_issue_req_rs_valid,
+  output logic        s_xif_issue_ready,
+  output logic        s_xif_issue_resp_accept,
+  output logic        s_xif_issue_resp_writeback,
+  output logic        s_xif_issue_resp_dualwrite,
+  output logic [2:0]  s_xif_issue_resp_dualread,
+  output logic        s_xif_issue_resp_loadstore,
+  output logic        s_xif_issue_resp_exc,
+
+  input  logic        s_xif_commit_valid,
+  input  logic [3:0]  s_xif_commit_id,
+  input  logic        s_xif_commit_kill,
+
+  output logic        s_xif_mem_valid,
+  input  logic        s_xif_mem_ready,
+  output logic [3:0]  s_xif_mem_req_id,
+  output logic [31:0] s_xif_mem_req_addr,
+  output logic [1:0]  s_xif_mem_req_mode,
+  output logic        s_xif_mem_req_we,
+  output logic [2:0]  s_xif_mem_req_size,
+  output logic [3:0]  s_xif_mem_req_be,
+  output logic [31:0] s_xif_mem_req_wdata,
+  output logic        s_xif_mem_req_last,
+  input  logic        s_xif_mem_resp_exc,
+  input  logic [5:0]  s_xif_mem_resp_exccode,
+
+  input  logic        s_xif_mem_result_valid,
+  input  logic [3:0]  s_xif_mem_result_id,
+  input  logic [31:0] s_xif_mem_result_rdata,
+  input  logic        s_xif_mem_result_err,
+
+  output logic        s_xif_result_valid,
+  input  logic        s_xif_result_ready,
+  output logic [3:0]  s_xif_result_id,
+  output logic [31:0] s_xif_result_data,
+  output logic [4:0]  s_xif_result_rd,
+  output logic        s_xif_result_we,
+  output logic        s_xif_result_exc,
+  output logic [5:0]  s_xif_result_exccode
+);
+
+  ara_xif_core #(
+    .NrLanes (NrLanes),
+    .VLEN    (VLEN)
+  ) i_ara (
+    .clk_i                      (clk_i),
+    .rst_ni                     (rst_ni),
+    .s_xif_issue_valid          (s_xif_issue_valid),
+    .s_xif_issue_req_instr      (s_xif_issue_req_instr),
+    .s_xif_issue_req_mode       (s_xif_issue_req_mode),
+    .s_xif_issue_req_id         (s_xif_issue_req_id),
+    .s_xif_issue_req_rs_0       (s_xif_issue_req_rs_0),
+    .s_xif_issue_req_rs_1       (s_xif_issue_req_rs_1),
+    .s_xif_issue_req_rs_2       (s_xif_issue_req_rs_2),
+    .s_xif_issue_req_rs_valid   (s_xif_issue_req_rs_valid),
+    .s_xif_issue_ready          (s_xif_issue_ready),
+    .s_xif_issue_resp_accept    (s_xif_issue_resp_accept),
+    .s_xif_issue_resp_writeback (s_xif_issue_resp_writeback),
+    .s_xif_issue_resp_dualwrite (s_xif_issue_resp_dualwrite),
+    .s_xif_issue_resp_dualread  (s_xif_issue_resp_dualread),
+    .s_xif_issue_resp_loadstore (s_xif_issue_resp_loadstore),
+    .s_xif_issue_resp_exc       (s_xif_issue_resp_exc),
+    .s_xif_commit_valid         (s_xif_commit_valid),
+    .s_xif_commit_id            (s_xif_commit_id),
+    .s_xif_commit_kill          (s_xif_commit_kill),
+    .s_xif_mem_valid            (s_xif_mem_valid),
+    .s_xif_mem_ready            (s_xif_mem_ready),
+    .s_xif_mem_req_id           (s_xif_mem_req_id),
+    .s_xif_mem_req_addr         (s_xif_mem_req_addr),
+    .s_xif_mem_req_mode         (s_xif_mem_req_mode),
+    .s_xif_mem_req_we           (s_xif_mem_req_we),
+    .s_xif_mem_req_size         (s_xif_mem_req_size),
+    .s_xif_mem_req_be           (s_xif_mem_req_be),
+    .s_xif_mem_req_wdata        (s_xif_mem_req_wdata),
+    .s_xif_mem_req_last         (s_xif_mem_req_last),
+    .s_xif_mem_resp_exc         (s_xif_mem_resp_exc),
+    .s_xif_mem_resp_exccode     (s_xif_mem_resp_exccode),
+    .s_xif_mem_result_valid     (s_xif_mem_result_valid),
+    .s_xif_mem_result_id        (s_xif_mem_result_id),
+    .s_xif_mem_result_rdata     (s_xif_mem_result_rdata),
+    .s_xif_mem_result_err       (s_xif_mem_result_err),
+    .s_xif_result_valid         (s_xif_result_valid),
+    .s_xif_result_ready         (s_xif_result_ready),
+    .s_xif_result_id            (s_xif_result_id),
+    .s_xif_result_data          (s_xif_result_data),
+    .s_xif_result_rd            (s_xif_result_rd),
+    .s_xif_result_we            (s_xif_result_we),
+    .s_xif_result_exc           (s_xif_result_exc),
+    .s_xif_result_exccode       (s_xif_result_exccode)
+  );
+
+endmodule
