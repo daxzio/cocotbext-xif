@@ -14,6 +14,7 @@ Migration status vs ~/projects/horcrux/sw/applications/tests/run_tests.sh:
 """
 
 import hashlib
+import os
 import struct
 
 import cocotb
@@ -117,7 +118,8 @@ async def _setup(dut, timeout_max=100000):
     init_reset_before_host(dut)
     xif_bus = XifBus.from_prefix(dut, "s_xif")
     host = XifHost(xif_bus, dut.clk_i, reset=dut.rst_ni, timeout_max=timeout_max)
-    XifMonitor(xif_bus, dut.clk_i)
+    if os.environ.get("HORCRUX_NO_MONITOR") != "1":
+        XifMonitor(xif_bus, dut.clk_i)
 
     await _reset_dut(dut)
     return host, HorcruxEncoder()
@@ -301,15 +303,20 @@ def _to_i8(value: int) -> int:
 async def _keccak_load_bytes(host, enc, data: bytes, start_pair_idx: int) -> int:
     load_instr = enc.encode_r4(FUNCT2_LOAD, funct3=FUNCT3_LOAD)
     idx = start_pair_idx
+    _dbg = os.environ.get("HORCRUX_LOAD_DEBUG") == "1"
     for offset in range(0, len(data), 8):
         lo = struct.unpack("<I", data[offset : offset + 4])[0]
         hi = struct.unpack("<I", data[offset + 4 : offset + 8])[0]
+        if _dbg:
+            host.log.info("keccak_load pre idx=%d lo=0x%x hi=0x%x", idx, lo, hi)
         await host.execute(
             load_instr,
             rs=(lo, hi, idx),
             rs_valid=0b111,
             check_we=False,
         )
+        if _dbg:
+            host.log.info("keccak_load post idx=%d", idx)
         for _ in range(10):
             await RisingEdge(host.clock)
         idx += 2
@@ -400,6 +407,8 @@ async def _sphincs_keccak_hw(host, enc, case: dict) -> bytes:
     idx = await _keccak_load_bytes(host, enc, case["addr"], idx)
     await _keccak_load_bytes(host, enc, payload, idx)
 
+    if os.environ.get("HORCRUX_LOAD_DEBUG") == "1":
+        host.log.info("sphincs_keccak: issuing thash funct7=%d", case["funct7"])
     thash_instr = enc.encode_r(case["funct7"], rd=0, rs1=0, rs2=0)
     simple_flag = 1 if case.get("simple_mode", 0) else 0
     await host.execute(
@@ -976,7 +985,12 @@ async def test_cbd_eta1(dut):
 @cocotb.test()
 async def test_thash1(dut):
     host, enc = await _setup(dut, timeout_max=1000000)
-    for case in THASH1_CASES:
+    _thash1_cases = THASH1_CASES
+    if os.environ.get("HORCRUX_THASH1_ONE_CASE") == "1":
+        _thash1_cases = THASH1_CASES[:1]
+    if (tmax := os.environ.get("HORCRUX_XIF_TIMEOUT_MAX")):
+        host.timeout_max = int(tmax)
+    for case in _thash1_cases:
         got = await _thash1_hw(host, enc, case)
         if got != case["expected"]:
             raise RuntimeError(

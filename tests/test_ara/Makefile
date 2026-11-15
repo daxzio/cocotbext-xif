@@ -191,13 +191,13 @@ endif
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
 
-# Icarus sim needs ara_xif_wrapper.v; rebuild via make sv2v when missing/outdated.
+# Icarus sim needs ara_xif_wrapper.v; icarus_sv2v.mak runs sv2v when the netlist is missing.
 ifeq ($(SIM),icarus)
 sim_build_icarus/sim.vvp: ara_xif_wrapper.v
 endif
 
-# Local sv2v with enum-method support (override if needed).
-SV2V ?= /mnt/sda/projects/sv2v/bin/sv2v
+# sv2v on PATH (spack/module); override if you need an enum-method build.
+SV2V ?= sv2v
 
 # sv2v cannot yet rewrite enum methods on fields of type-parameter types
 # (ara_req_t.emul.next). Use next_lmul(), which matches .next() for legal LMULs.
@@ -218,4 +218,6 @@ sv2v: $(ARA_DISPATCHER_SV2V)
 .PHONY: sv2v
 clean::
 	rm -f $(ARA_DISPATCHER_SV2V)
+
+include $(RTLFLO_PATH)/icarus_sv2v.mak
 

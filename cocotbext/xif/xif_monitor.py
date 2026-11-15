@@ -76,7 +76,7 @@ class XifMonitor(XifBase):
         self._result_id = 0
 
         self._run_coroutine: Any = start_soon(self._run())
-        self._resolve_coroutine: Any = start_soon(self._resolve_signals())
+        self._resolve_coroutine = None
         self._check_sync_coroutines: List[Any] = []
 
     def enable_check_sync(self) -> None:
@@ -111,12 +111,10 @@ class XifMonitor(XifBase):
                         f"at {self._last_clk_time}"
                     )
 
-    async def _resolve_signals(self) -> None:
-        while True:
-            for sig in self.bus._signals:
-                if hasattr(self.bus, sig) and getattr(self.bus, sig) is not None:
-                    setattr(self, f"_{sig}", resolve_x_int(getattr(self.bus, sig)))
-            await RisingEdge(self.clock)
+    def _sample_bus(self) -> None:
+        for sig in self.bus._signals:
+            if hasattr(self.bus, sig) and getattr(self.bus, sig) is not None:
+                setattr(self, f"_{sig}", resolve_x_int(getattr(self.bus, sig)))
 
     async def _run(self) -> None:
         prev_issue_valid = 0
@@ -126,6 +124,8 @@ class XifMonitor(XifBase):
 
         while True:
             await RisingEdge(self.clock)
+            await ReadOnly()
+            self._sample_bus()
             cycle = get_sim_time("ns")
 
             if self._issue_valid and not self._issue_ready:

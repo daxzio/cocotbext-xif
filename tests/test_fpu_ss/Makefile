@@ -100,6 +100,11 @@ XILINX_PRE_CUSTOM +=\
     set_msg_config -id {HDL 9-3952} -new_severity {ADVISORY}; \
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
+include $(RTLFLO_PATH)/icarus_sv2v.mak
+
+ifeq ($(SIM),icarus)
+sim_build_icarus/sim.vvp: fpu_ss_wrapper.v
+endif
 
 
 

@@ -1,8 +1,14 @@
 # Aggregate cocotb suite runs from the repo root.
-# Activate the project venv first: source ~/.venv/horcrux-3.13.5/bin/activate
+# Verilator / Icarus: source ~/.venv/horcrux-3.13.5/bin/activate
+# xezim: module load xezim/0.11.6; source ~/.venv/xezim-3.14.5/bin/activate; make sim SIM=xezim
 
 SIM ?= verilator
 WAVES ?= 0
+# cocotb-xezim default is 10s; HORCRUX/Ara suites need more wall time.
+ifeq ($(SIM),xezim)
+XEZIM_MAX_TIME ?= 60s
+export XEZIM_MAX_TIME
+endif
 
 XIF_SUITES := \
 	test_xif_copro \
@@ -11,9 +17,13 @@ XIF_SUITES := \
 	test_horcrux_apb \
 	test_ara
 
-.PHONY: default sim verilator icarus clean $(XIF_SUITES)
+.PHONY: default sim verilator icarus xezim clean $(XIF_SUITES)
 
 default: sim
+
+# xezim uses SystemVerilog sources directly (like Verilator); requires cocotb-xezim makefiles.
+xezim:
+	$(MAKE) sim SIM=xezim
 
 # Verilator is the primary flow. tests/test_ara pins VERILATOR_BIN_DIR to spack
 # 5.050 in its Makefile (5.052+ OOM in ConstVisitor on Ara). Other suites use
@@ -25,7 +35,8 @@ icarus:
 
 define run_xif_suite
 	@echo "=== tests/$(1) SIM=$(SIM) WAVES=$(WAVES) ==="
-	cd tests/$(1) && $(MAKE) clean sim SIM=$(SIM) WAVES=$(WAVES) && ../rtlflo/combine_results.py
+	cd tests/$(1) && $(MAKE) clean
+	cd tests/$(1) && $(MAKE) sim SIM=$(SIM) WAVES=$(WAVES) && ../rtlflo/combine_results.py
 endef
 
 test_xif_copro:

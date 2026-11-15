@@ -145,6 +145,7 @@ XILINX_PRE_CUSTOM += \
     set_msg_config -id {Synth 8-689} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-6901} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-6841} -new_severity {CRITICAL WARNING}; \
+    set_msg_config -id {Synth 8-7023} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Synth 8-7071} -new_severity {CRITICAL WARNING}; \
     set_msg_config -id {Designutils 20-1280} -new_severity {WARNING}; \
     set_msg_config -id {Designutils 20-1281} -new_severity {WARNING}; \
@@ -161,11 +162,19 @@ XILINX_POST_CUSTOM += \
     set_property source_mgmt_mode All [current_project]; \
     update_compile_order -fileset sources_1; \
 
-vivado_clean:
-	rm -rf build-*/
+VIVADO_JOBS ?= 8
+VIVADO ?= $(if $(VIVADO_PATH),$(VIVADO_PATH)/bin/vivado,vivado)
+BUILD_DIR ?= build-${XILINX_REV}
+# write_bitstream (default) or route_design for utilization-only.
+VIVADO_TO_STEP ?= write_bitstream
 
-vivado_build: vivado_clean
+export XILINX_REV
+export XILINX_PART
+export VIVADO_TO_STEP
+
+vivado_build:
 	@ export XILINX_PART="${XILINX_PART}" ; \
+	export XILINX_REV="${XILINX_REV}" ; \
 	export XILINX_CONSTRAINTS="${XILINX_CONSTRAINTS}" ; \
 	export XILINX_PRE_CUSTOM='${XILINX_PRE_CUSTOM}' ; \
 	export XILINX_POST_CUSTOM='${XILINX_POST_CUSTOM}' ; \
@@ -176,4 +185,22 @@ vivado_build: vivado_clean
 	export DEFINES="${XILINX_DEFINES}" ; \
 	export FPGA_DESIGN="${FPGA_DESIGN}" ; \
 		${RTLFLO_PATH}/vivado_helper.py
+
+# Synth + impl on an existing build-<XILINX_REV> project (run vivado_build first).
+# VIVADO_TO_STEP=route_design skips bitstream and writes utilization reports.
+vivado_synth:
+	@if [ ! -d "${BUILD_DIR}" ] || ! ls "${BUILD_DIR}"/*.xpr >/dev/null 2>&1; then \
+		echo "ERROR: no Vivado project under ${BUILD_DIR}; run 'make vivado_build' first."; \
+		exit 1; \
+	fi
+	@ export BUILD_NAME="${BUILD_NAME}" XILINX_REV="${XILINX_REV}" SYNTH_TOP="${SYNTH_TOP}" \
+		VIVADO_JOBS="${VIVADO_JOBS}" VIVADO_TO_STEP="${VIVADO_TO_STEP}" ; \
+	${VIVADO} -mode batch -source ${RTLFLO_PATH}/vivado_synth_impl.tcl
+
+vivado_all: vivado_build vivado_synth
+
+.PHONY: vivado_build vivado_synth vivado_all vivado_clean
+
+vivado_clean:
+	rm -rf build-*/ vivado* *.err .Xil/
 

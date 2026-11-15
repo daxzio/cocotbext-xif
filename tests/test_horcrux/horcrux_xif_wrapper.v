@@ -2396,8 +2396,8 @@ module horcrux_xif_wrapper (
 						select_insn = 7'b0000000;
 						save_rd = 1'sb0;
 						rs_values = 1'sb0;
-						rd_o <= 1'sb0;
-						id_o <= 1'sb0;
+						rd_o = 1'sb0;
+						id_o = 1'sb0;
 						begin : sv2v_autoblock_1
 							reg [31:0] i;
 							for (i = 0; i < horcrux_pkg_NbInstr; i = i + 1)
@@ -2412,8 +2412,8 @@ module horcrux_xif_wrapper (
 									rs_values[95-:32] = horcrux_xif_wrapper.ext_if.issue_req[((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6)) - ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) - 1)+:32'd32];
 									rs_values[63-:32] = horcrux_xif_wrapper.ext_if.issue_req[((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6)) - ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) - 33)+:32'd32];
 									rs_values[31-:32] = horcrux_xif_wrapper.ext_if.issue_req[((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6)) - ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) - 65)+:32'd32];
-									rd_o <= instruction[11-:5];
-									id_o <= horcrux_xif_wrapper.ext_if.issue_req[32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6))-:((32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6))) >= ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 7)) ? ((32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6))) - ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 7))) + 1 : (((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 7)) - (32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6)))) + 1)];
+									rd_o = instruction[11-:5];
+									id_o = horcrux_xif_wrapper.ext_if.issue_req[32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6))-:((32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6))) >= ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 7)) ? ((32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6))) - ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 7))) + 1 : (((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 7)) - (32'd4 + ((sv2v_cast_32(_param_8228B_X_NUM_RS) * 32'd32) + (sv2v_cast_32(_param_8228B_X_NUM_RS) + 6)))) + 1)];
 								end
 						end
 					end

@@ -154,12 +154,15 @@ device = XifDevice(bus, dut.clk_i, handler=handler)
 
 Vendored simulation RTL lives under `tests/rtl/` (refresh with `scripts/vendor_test_rtl.sh` before large Ara/HORCRUX updates).
 
-From the repo root (all suites, Verilator by default; CI uses **veryl-lang/setup-verilator** at **5.050** because Ara fails on 5.052+):
+From the repo root (all suites, Verilator by default). CI: **Verilator** (`test_xif_verilator.yml`) and **xezim** (`test_xif_xezim.yml`) run the full suite; **Icarus** root-suite CI is held until [docs/icarus-thash-hang.md](docs/icarus-thash-hang.md) is resolved (`test_thash1` vvp freeze).
 
 ```bash
 source ~/.venv/horcrux-3.13.5/bin/activate   # or your cocotb venv
 make sim              # or: make sim WAVES=0
-make sim SIM=icarus   # Icarus (run make sv2v in each suite first where needed)
+make icarus           # from clean: each suite runs sv2v then sim (see tests/rtlflo/icarus_sv2v.mak)
+module load xezim/0.11.6                    # xezim on PATH
+source ~/.venv/xezim-3.14.5/bin/activate    # cocotb-xezim (SIM=xezim makefiles)
+make xezim                                  # or: ./scripts/run_xif_tests.sh xezim
 ```
 
 One suite at a time:

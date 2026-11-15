@@ -78,6 +78,7 @@ ifneq (,$(wildcard ./makefile_synth.mak))
 endif
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
+include $(RTLFLO_PATH)/icarus_sv2v.mak
 
 FPGA_DESIGN := $(SV2V_EXT_SOURCES) $(SV2V_INT_SOURCES)
 XILINX_DEFINES :=

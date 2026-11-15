@@ -109,8 +109,8 @@ module id_stage
     select_insn                       = none;
     save_rd                           = '0;
     rs_values                         = '0;
-    rd_o <= '0;
-    id_o <= '0;
+    rd_o                              = '0;
+    id_o                              = '0;
 
     for (int unsigned i = 0; i < NbInstr; i++) begin
       if (sel[i] && xif_issue_if.issue_valid) begin
@@ -129,8 +129,8 @@ module id_stage
         rs_values.rs2                   = xif_issue_if.issue_req.rs[1];
         rs_values.rs3                   = xif_issue_if.issue_req.rs[2];
 
-        rd_o <= instruction.as_horcrux_R.rd;
-        id_o <= xif_issue_if.issue_req.id;
+        rd_o                              = instruction.as_horcrux_R.rd;
+        id_o                              = xif_issue_if.issue_req.id;
       end
     end
   end

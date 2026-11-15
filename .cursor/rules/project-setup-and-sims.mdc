@@ -7,10 +7,20 @@ alwaysApply: true
 
 ## Environment
 
-Activate the project venv before install/test work:
+Activate the project venv before install/test work (Verilator / Icarus):
 
 ```bash
 source ~/.venv/horcrux-3.13.5/bin/activate
+```
+
+**xezim** (SystemVerilog elaboration at run time; needs **cocotb-xezim** makefiles from the module):
+
+```bash
+module load xezim/0.11.6
+source ~/.venv/xezim-3.14.5/bin/activate
+cd /path/to/cocotbext-xif
+make xezim WAVES=0
+# override: XEZIM_BIN=… XEZIM_MAX_TIME=120s (root Makefile exports 60s by default)
 ```
 
 Then from the repo root: `pip install -e .` and `pip install -r requirements.txt` as needed.
@@ -28,17 +38,17 @@ Public driver/responder names are `XifHost` and `XifDevice`. Do not document leg
 
 ## Existing tests (`tests/`)
 
-Four cocotb suites; run with `make sim SIM=<sim> WAVES=0` from each directory (MODULE=`test_dut`).
+Five cocotb suites; run with `make sim SIM=<sim> WAVES=0` from each directory, or `make sim` / `make xezim` from the repo root (`MODULE=test_dut`).
 
 | Suite | Verilator | Icarus |
 |-------|-----------|--------|
 | `tests/test_xif_copro` | PASS | PASS |
 | `tests/test_fpu_ss` | PASS | PASS |
-| `tests/test_ara` | PASS on **5.050 only** | PASS (`make sv2v` then `make sim SIM=icarus`) |
-| `tests/test_horcrux` | PASS | PASS (`make sv2v` then `make sim SIM=icarus`) |
-| `tests/test_horcrux_apb` | PASS | PASS (`make sv2v` then `make sim SIM=icarus`; hulkv2 venv) |
+| `tests/test_ara` | PASS on **5.050 only** | PASS (`make sim SIM=icarus`; auto `sv2v`) |
+| `tests/test_horcrux` | PASS | Mostly PASS; **`test_thash1` hangs Icarus** — see `docs/icarus-thash-hang.md` (no full-suite Icarus CI yet) |
+| `tests/test_horcrux_apb` | PASS | PASS (same; hulkv2 venv if needed) |
 
-Icarus needs a prebuilt `.v` from `make sv2v` in each suite directory.
+Icarus: `tests/rtlflo/icarus_sv2v.mak` makes `sim` depend on `$(TOPLEVEL).v` and runs `make sv2v` when missing. Root `make icarus` runs all suites from `make clean`.
 
 ## Verilator 5.052+ vs Ara
 

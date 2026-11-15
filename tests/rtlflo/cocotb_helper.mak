@@ -49,6 +49,8 @@ ifeq ($(TOPLEVEL_LANG),verilog)
 		COMPILE_ARGS += -disable_sem2009
 		COMPILE_ARGS += -sv
 # 		COMPILE_ARGS += -top ${TOPLEVEL}
+	else ifeq ($(SIM),xezim)
+        DEFINES += COCOTB_XEZIM=1
 	else ifeq ($(SIM),verilator)
 # 		IGNORE_ARGS += -Wno-WIDTHEXPAND
 # 		IGNORE_ARGS += -Wno-WIDTHTRUNC
@@ -92,6 +94,9 @@ ifeq ($(TOPLEVEL_LANG),verilog)
 	else ifeq ($(SIM),xcelium)
 	    # xrun only pass numerics, string are not working
         EXTRA_ARGS += $(addprefix -defparam ${TOPLEVEL}., $(GENERICS))
+	else ifeq ($(SIM),xezim)
+	    # Quote like Icarus (-P) and Verilator (-G); bare paths fail untyped string params.
+	    COMPILE_ARGS += $(addprefix -g/${TOPLEVEL}/, $(addsuffix ', $(subst =,=', $(GENERICS))))
 	endif
 else ifeq ($(TOPLEVEL_LANG),vhdl)
     ifneq ($(filter $(SIM),ghdl riviera activehdl),)
@@ -119,6 +124,8 @@ ifeq ($(TOPLEVEL_LANG),verilog)
 	    EXTRA_ARGS += $(addprefix -D, $(DEFINES))
 	else ifneq ($(filter $(SIM),ius xcelium),)
 	    EXTRA_ARGS += $(addprefix -define , $(DEFINES))
+	else ifeq ($(SIM),xezim)
+	    COMPILE_ARGS += $(addprefix -D , $(DEFINES))
 	endif
 else ifeq ($(TOPLEVEL_LANG),vhdl)
     ifneq ($(filter $(SIM),ghdl riviera activehdl),)
@@ -154,6 +161,8 @@ else ifeq ($(SIM), ius)
 	simvision -waves waves.shm &
 else ifeq ($(SIM),verilator)
 	gtkwave dump.fst &
+else ifeq ($(SIM),xezim)
+	gtkwave ${SIM_BUILD}/${TOPLEVEL}.fst &
 endif
 
 # .PHONY: retest

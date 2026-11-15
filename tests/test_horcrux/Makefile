@@ -76,6 +76,7 @@ ifneq (,$(wildcard ./makefile_synth.mak))
 endif
 
 include $(RTLFLO_PATH)/cocotb_helper.mak
+include $(RTLFLO_PATH)/icarus_sv2v.mak
 
 # Vivado must see the SV RTL, not the Icarus sv2v netlist or a duplicated file list.
 FPGA_DESIGN := $(SV2V_EXT_SOURCES) $(SV2V_INT_SOURCES)

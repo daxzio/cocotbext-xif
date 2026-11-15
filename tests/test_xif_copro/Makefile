@@ -38,6 +38,7 @@ endif
 IGNORE_ARGS += -Wno-UNOPTFLAT
 
 include ${WORK_BASE}/rtlflo/cocotb_helper.mak
+include ${WORK_BASE}/rtlflo/icarus_sv2v.mak
 
 ifeq ($(SIM),icarus)
 sim_build_icarus/sim.vvp: xif_copro_wrapper.v

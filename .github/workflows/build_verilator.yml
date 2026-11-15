@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Setup Verilator
-        uses: veryl-lang/setup-verilator@v2
-        with:
-          version: 5.050
+        uses: veryl-lang/setup-verilator@v1
       - name: Report Verilator
         run: verilator --version
