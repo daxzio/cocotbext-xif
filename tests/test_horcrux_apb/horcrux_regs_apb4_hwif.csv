@@ -1,0 +1,10 @@
+signal_name,direction,width,rdl_path,address,sw_access,hw_access,reset_value
+i_rd1_value,input,32,horcrux_regs_apb4.RD1.VALUE,0x00000018,r,w,0x0
+i_status_accept,input,1,horcrux_regs_apb4.STATUS.ACCEPT,0x00000014,r,w,0x1
+i_status_busy,input,1,horcrux_regs_apb4.STATUS.BUSY,0x00000014,r,w,0x0
+i_status_done,input,1,horcrux_regs_apb4.STATUS.DONE,0x00000014,rw,w,0x0
+o_cmd_opcode,output,7,horcrux_regs_apb4.CMD.OPCODE,0x0000000C,rw,r,0x0
+o_instr_value,output,32,horcrux_regs_apb4.INSTR.VALUE,0x00000010,rw,r,0x0
+o_rs1_value,output,32,horcrux_regs_apb4.RS1.VALUE,0x00000000,rw,r,0x0
+o_rs2_value,output,32,horcrux_regs_apb4.RS2.VALUE,0x00000004,rw,r,0x0
+o_rs3_value,output,32,horcrux_regs_apb4.RS3.VALUE,0x00000008,rw,r,0x0

@@ -18,9 +18,9 @@ MODULE = test_dut
 
 # ---------- Include dirs (coprocessor only) ----------
 VERILOG_INCLUDE_DIRS += \
-	$(ASIC_DIR)/common_cells.bck/include \
-	$(ASIC_DIR)/axi.bck/include \
-	$(ASIC_DIR)/cva6.bck/core/include \
+	$(ASIC_DIR)/common_cells/include \
+	$(ASIC_DIR)/axi/include \
+	$(ASIC_DIR)/cva6/include \
 	$(ASIC_DIR)/ara/hardware/include
 
 # ---------- Defines ----------
@@ -73,7 +73,7 @@ EXT_VERILOG_SOURCES += \
 	$(ASIC_DIR)/common_cells/fall_through_register.sv
 
 # ---------- FPnew (ara_pkg + lane vmfpu), tech_cells (VRF), common_cells extras ----------
-FPNEW := $(ASIC_DIR)/ara.bck/hardware/deps/fpnew
+FPNEW := $(ASIC_DIR)/ara/hardware/deps/fpnew
 EXT_VERILOG_SOURCES += \
 	$(FPNEW)/src/fpnew_pkg.sv \
 	$(FPNEW)/src/fpnew_rounding.sv \
@@ -165,15 +165,18 @@ IGNORE_ARGS += -Wno-SIDEEFFECT
 # Parallel Verilator C++ build (large speedup). Override with BUILD_ARGS= if needed.
 BUILD_ARGS += -j$(shell nproc 2>/dev/null || echo 8)
 
-# Verilator 5.052 and 5.054 elaborate Ara until ConstVisitor's C stack fills RAM.
-# No %Error, and Vtop.mk is never written. 5.050 finishes at about 1.7 GB.
-# `module load verilator` is 5.054. Detail: VERILATOR-5.052.md.
-VERILATOR_5050_BIN := $(firstword $(wildcard /cadtools/spack-2025/opt/linux-ubuntu24.04-skylake/gcc-13.3.0/verilator/5.050-*/bin))
+# Verilator 5.052+ OOMs elaborating Ara (ConstVisitor stack). CI and local sim use 5.050.
+# Detail: VERILATOR-5.052.md. Override with VERILATOR_BIN_DIR when needed.
 ifeq ($(SIM),verilator)
-ifeq ($(strip $(VERILATOR_5050_BIN)),)
-$(error Verilator 5.050 not found under the spack prefix; 5.052 and later OOM on Ara. See VERILATOR-5.052.md)
-endif
+VERILATOR_5050_OK := $(shell verilator --version 2>/dev/null | grep -q '5\.050' && echo 1)
+ifeq ($(strip $(VERILATOR_BIN_DIR)),)
+VERILATOR_5050_BIN := $(firstword $(wildcard /cadtools/spack-2025/opt/linux-ubuntu24.04-skylake/gcc-13.3.0/verilator/5.050-*/bin))
+ifneq ($(strip $(VERILATOR_5050_BIN)),)
 VERILATOR_BIN_DIR := $(VERILATOR_5050_BIN)
+else ifneq ($(VERILATOR_5050_OK),1)
+$(error tests/test_ara requires Verilator 5.050; 5.052+ OOM on Ara. See VERILATOR-5.052.md)
+endif
+endif
 endif
 
 # Snapshot full SV lists for sv2v before Icarus replaces them with the flat .v.

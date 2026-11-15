@@ -1,0 +1,14 @@
+/*
+ * Property extensions for PeakRDL-etana (wr_swacc / rd_swacc strobes).
+ * Copied from daxzio-hazard3/rdl/eva/regblock_udps.rdl
+ */
+
+property rd_swacc {
+    component = field;
+    type = boolean;
+};
+
+property wr_swacc {
+    component = field;
+    type = boolean;
+};

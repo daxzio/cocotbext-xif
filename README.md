@@ -1,6 +1,7 @@
 # CORE-V XIF interface modules for Cocotb
 
-[![Build Status](https://github.com/daxzio/cocotbext-xif/actions/workflows/test_checkin.yml/badge.svg?branch=main)](https://github.com/daxzio/cocotbext-xif/actions/)
+[![Build Status](https://github.com/daxzio/cocotbext-xif/actions/workflows/test_xif_verilator.yml/badge.svg?branch=main)](https://github.com/daxzio/cocotbext-xif/actions/workflows/test_xif_verilator.yml)
+[![Lint / matrix](https://github.com/daxzio/cocotbext-xif/actions/workflows/test_checkin.yml/badge.svg?branch=main)](https://github.com/daxzio/cocotbext-xif/actions/)
 [![PyPI version](https://badge.fury.io/py/cocotbext-xif.svg)](https://pypi.org/project/cocotbext-xif)
 [![Downloads](https://pepy.tech/badge/cocotbext-xif)](https://pepy.tech/project/cocotbext-xif)
 
@@ -151,10 +152,19 @@ device = XifDevice(bus, dut.clk_i, handler=handler)
 
 ## Running tests
 
-From a suite directory under `tests/`:
+Vendored simulation RTL lives under `tests/rtl/` (refresh with `scripts/vendor_test_rtl.sh` before large Ara/HORCRUX updates).
+
+From the repo root (all suites, Verilator by default; CI builds Verilator **5.050** because Ara fails on 5.052+):
 
 ```bash
 source ~/.venv/horcrux-3.13.5/bin/activate   # or your cocotb venv
+make sim              # or: make sim WAVES=0
+make sim SIM=icarus   # Icarus (run make sv2v in each suite first where needed)
+```
+
+One suite at a time:
+
+```bash
 cd tests/test_xif_copro
 make sim SIM=verilator WAVES=0
 ```

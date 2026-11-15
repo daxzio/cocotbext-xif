@@ -21,4 +21,10 @@ venv*/
 vivado*
 interim.txt
 hs_err_pid*.log
+xezim_cov.json
+*.pre-icarus-fix
+tests/**/build-*/
+tests/**/interim.txt
+# Local backup snapshots; canonical vendored trees live without the .bck suffix.
 *.bck
+/tests/rtl/ara.bck/

@@ -1,0 +1,77 @@
+// HORCRUX coprocessor APB control registers (PeakRDL-etana / apb4-flat).
+addrmap HORCRUX_REGS {
+    name = "HORCRUX_REGS";
+    desc = "APB front-end for the HORCRUX PQC coprocessor core";
+
+    default regwidth = 32;
+    default sw = rw;
+    default hw = r;
+
+    reg {
+        name = "RS1";
+        desc = "Operand rs1 (mirrors CV-X-IF issue_req.rs[0])";
+        field {
+        } VALUE[31:0] = 0;
+    } RS1 @ 0x00;
+
+    reg {
+        name = "RS2";
+        desc = "Operand rs2 (mirrors CV-X-IF issue_req.rs[1])";
+        field {
+        } VALUE[31:0] = 0;
+    } RS2 @ 0x04;
+
+    reg {
+        name = "RS3";
+        desc = "Operand rs3 (mirrors CV-X-IF issue_req.rs[2])";
+        field {
+        } VALUE[31:0] = 0;
+    } RS3 @ 0x08;
+
+    reg {
+        name = "CMD";
+        desc = "Direct horcrux_insn opcode; write strobe issues one operation";
+        field {
+            sw = rw;
+            hw = r;
+            wr_swacc;
+        } OPCODE[6:0] = 0;
+    } CMD @ 0x0C;
+
+    reg {
+        name = "INSTR";
+        desc = "Raw 32-bit custom instruction alias (predecoded when EnableInstrDecode=1)";
+        field {
+            sw = rw;
+            hw = r;
+            wr_swacc;
+        } VALUE[31:0] = 0;
+    } INSTR @ 0x10;
+
+    reg {
+        name = "STATUS";
+        desc = "Command sequencer status";
+        field {
+            sw = r;
+            hw = w;
+        } BUSY[0:0] = 0;
+        field {
+            sw = rw;
+            hw = w;
+            woclr;
+        } DONE[1:1] = 0;
+        field {
+            sw = r;
+            hw = w;
+        } ACCEPT[2:2] = 1;
+    } STATUS @ 0x14;
+
+    reg {
+        name = "RD1";
+        desc = "Result data (mirrors CV-X-IF result.data / horcrux out_t.rd1)";
+        field {
+            sw = r;
+            hw = w;
+        } VALUE[31:0] = 0;
+    } RD1 @ 0x18;
+};
