@@ -7,25 +7,20 @@ on:
     - cron: "0 2 * * 0"
 
 jobs:
-  # Ara OOMs on 5.052+ (ConstVisitor stack). Pin 5.050 for the full suite.
-  verilator_5050:
-    uses: ./.github/workflows/setup_verilator.yml
-    with:
-      githash: v5.050
-
   xif_verilator:
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.13"]
+    # ubuntu-latest can drift; 26.04 has the prebuilt asset (veryl-lang/setup-verilator#2).
     runs-on: ubuntu-26.04
-    needs: verilator_5050
 
     steps:
       - uses: actions/checkout@v7
-      - name: Add Verilator 5.050 to PATH
-        run: |
-          echo "${{ needs.verilator_5050.outputs.cache_dir }}/bin" >> $GITHUB_PATH
+      - name: Setup Verilator 5.050
+        uses: veryl-lang/setup-verilator@v2
+        with:
+          version: 5.050
       - name: Report Verilator
         run: verilator --version
       - name: Set up Python ${{ matrix.python-version }}
