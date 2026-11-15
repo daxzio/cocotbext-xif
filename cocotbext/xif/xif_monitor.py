@@ -26,14 +26,12 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Deque, List, Set
+from typing import Any
 
 from cocotb import start_soon
 from cocotb.triggers import ReadOnly, RisingEdge
 from cocotb.utils import get_sim_time
 
-from .constants import XifMode
-from .transaction import XifInsn, XifMemReq, XifResult
 from .utils import resolve_x_int
 from .xif_base import XifBase
 
@@ -55,10 +53,10 @@ class XifMonitor(XifBase):
         self.check_protocol = check_protocol
         self.timeout_max = 1000
 
-        self.records: Deque[XifMonitorRecord] = deque()
-        self._issued_ids: Set[int] = set()
-        self._committed_ids: Set[int] = set()
-        self._result_ids: Set[int] = set()
+        self.records: deque[XifMonitorRecord] = deque()
+        self._issued_ids: set[int] = set()
+        self._committed_ids: set[int] = set()
+        self._result_ids: set[int] = set()
 
         self._issue_valid = 0
         self._issue_ready = 0
@@ -77,7 +75,7 @@ class XifMonitor(XifBase):
 
         self._run_coroutine: Any = start_soon(self._run())
         self._resolve_coroutine = None
-        self._check_sync_coroutines: List[Any] = []
+        self._check_sync_coroutines: list[Any] = []
 
     def enable_check_sync(self) -> None:
         self.disable_check_sync()

@@ -4,8 +4,8 @@ XIF transaction records and ID allocation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, Sequence, Tuple
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from .constants import XifMode
 
@@ -16,10 +16,10 @@ class XifInsn:
 
     instr: int
     rs: Sequence[int] = (0, 0, 0)
-    rs_valid: Optional[int] = None
+    rs_valid: int | None = None
     mode: XifMode = XifMode.MMODE
     id: int = 0
-    expected: Optional[int] = None
+    expected: int | None = None
     check_we: bool = True
     committed: bool = False
     accepted: bool = False

@@ -26,8 +26,8 @@ import datetime
 import logging
 from typing import Any
 
-from .version import __version__
 from .utils import resolve_x_int
+from .version import __version__
 
 
 class XifBase:
@@ -76,7 +76,7 @@ class XifBase:
 
         self.log.debug("XIF signals:")
         for sig in sorted(
-            list(set().union(self.bus._signals, self.bus._optional_signals))
+            set().union(self.bus._signals, self.bus._optional_signals)
         ):
             if not hasattr(self.bus, sig):
                 self.log.debug(f"  {sig}: not present")
@@ -115,7 +115,7 @@ class XifBase:
     async def _wait_reset_release(self) -> None:
         if self.reset is None:
             return
-        from cocotb.triggers import RisingEdge, FallingEdge
+        from cocotb.triggers import FallingEdge, RisingEdge
 
         active = int(self.reset_active_level)
         release_edge = RisingEdge if not self.reset_active_level else FallingEdge

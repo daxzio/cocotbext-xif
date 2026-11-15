@@ -25,7 +25,8 @@ THE SOFTWARE.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Deque, Dict, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
 from cocotb import start_soon
 from cocotb.triggers import Event, ReadOnly, RisingEdge
@@ -46,7 +47,7 @@ class XifHost(XifBase):
         reset=None,
         reset_active_level: bool = False,
         timeout_max: int = 100,
-        mem: Optional[Memory] = None,
+        mem: Memory | None = None,
         commit_delay: int = 1,
         **kwargs,
     ) -> None:
@@ -64,10 +65,10 @@ class XifHost(XifBase):
         self.commit_delay = commit_delay
 
         self._ids = IdAllocator(self.id_width)
-        self._issue_queue: Deque[XifInsn] = deque()
-        self._pending: Dict[int, XifInsn] = {}
-        self._result_events: Dict[int, Event] = {}
-        self._results: Dict[int, XifResult] = {}
+        self._issue_queue: deque[XifInsn] = deque()
+        self._pending: dict[int, XifInsn] = {}
+        self._result_events: dict[int, Event] = {}
+        self._results: dict[int, XifResult] = {}
         self._idle = Event()
         self._idle.set()
         self._issue_busy = False
@@ -368,7 +369,7 @@ class XifHost(XifBase):
             rdata = 0
             try:
                 rdata = await self._handle_mem_req(req)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 self.log.warning(
                     "Memory access failed id %d addr 0x%x: %s",
                     req.id,

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import struct
 from abc import ABC, abstractmethod
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from .riscv import encode_r, encode_r4
 

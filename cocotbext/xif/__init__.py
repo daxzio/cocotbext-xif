@@ -22,61 +22,64 @@ THE SOFTWARE.
 
 """
 
-from .version import __version__
-
-from .xif_bus import XifBus
-from .xif_host import XifHost
-from .xif_monitor import XifMonitor
-from .xif_device import XifDevice
-
+from .address_space import (
+    AddressSpace,
+    MemoryInterface,
+    MemoryRegion,
+    PeripheralRegion,
+    Pool,
+    Region,
+    SparseMemoryRegion,
+    Window,
+    WindowPool,
+)
 from .constants import XifMode
-
-from .transaction import XifInsn, XifResult, XifMemReq, XifMemResult, IdAllocator
-
-from .riscv import encode_r, encode_r4, encode_i
 from .encoders import (
-    InsnEncoder,
     BitrevEncoder,
     FaddSEncoder,
-    RvvConfigEncoder,
     HorcruxEncoder,
+    InsnEncoder,
+    RvvConfigEncoder,
     vtype_encode,
 )
-
 from .memory import Memory
-from .address_space import MemoryInterface, Window, WindowPool
-from .address_space import Region, MemoryRegion, SparseMemoryRegion, PeripheralRegion
-from .address_space import AddressSpace, Pool
+from .riscv import encode_i, encode_r, encode_r4
+from .transaction import IdAllocator, XifInsn, XifMemReq, XifMemResult, XifResult
+from .version import __version__
+from .xif_bus import XifBus
+from .xif_device import XifDevice
+from .xif_host import XifHost
+from .xif_monitor import XifMonitor
 
 __all__ = [
-    "__version__",
-    "XifBus",
-    "XifHost",
-    "XifMonitor",
-    "XifDevice",
-    "XifMode",
-    "XifInsn",
-    "XifResult",
-    "XifMemReq",
-    "XifMemResult",
-    "IdAllocator",
-    "encode_r",
-    "encode_r4",
-    "encode_i",
-    "InsnEncoder",
+    "AddressSpace",
     "BitrevEncoder",
     "FaddSEncoder",
-    "RvvConfigEncoder",
     "HorcruxEncoder",
-    "vtype_encode",
+    "IdAllocator",
+    "InsnEncoder",
     "Memory",
     "MemoryInterface",
+    "MemoryRegion",
+    "PeripheralRegion",
+    "Pool",
+    "Region",
+    "RvvConfigEncoder",
+    "SparseMemoryRegion",
     "Window",
     "WindowPool",
-    "Region",
-    "MemoryRegion",
-    "SparseMemoryRegion",
-    "PeripheralRegion",
-    "AddressSpace",
-    "Pool",
+    "XifBus",
+    "XifDevice",
+    "XifHost",
+    "XifInsn",
+    "XifMemReq",
+    "XifMemResult",
+    "XifMode",
+    "XifMonitor",
+    "XifResult",
+    "__version__",
+    "encode_i",
+    "encode_r",
+    "encode_r4",
+    "vtype_encode",
 ]

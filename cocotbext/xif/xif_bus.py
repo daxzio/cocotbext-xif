@@ -1,8 +1,10 @@
+from typing import ClassVar
+
 from .bus import Bus
 
 
 class XifBus(Bus):
-    _signals = [
+    _signals: ClassVar[list[str]] = [
         "issue_valid",
         "issue_ready",
         "issue_req_instr",
@@ -45,7 +47,7 @@ class XifBus(Bus):
         "result_exc",
         "result_exccode",
     ]
-    _optional_signals = [
+    _optional_signals: ClassVar[list[str]] = [
         "issue_req_rs_2",
         "issue_req_ecs",
         "issue_req_ecs_valid",

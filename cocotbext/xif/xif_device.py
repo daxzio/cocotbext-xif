@@ -25,18 +25,18 @@ THE SOFTWARE.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Callable, Deque, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from cocotb import start_soon
-from cocotb.triggers import Event, RisingEdge
+from cocotb.triggers import RisingEdge
 
 from .constants import XifMode
 from .memory import Memory
-from .transaction import IdAllocator, XifInsn, XifMemReq, XifResult
+from .transaction import IdAllocator, XifInsn
 from .xif_base import XifBase
 
-
-Handler = Callable[[XifInsn], Optional[int]]
+Handler = Callable[[XifInsn], int | None]
 
 
 class XifDevice(XifBase):
@@ -48,8 +48,8 @@ class XifDevice(XifBase):
         clock,
         reset=None,
         reset_active_level: bool = False,
-        handler: Optional[Handler] = None,
-        mem: Optional[Memory] = None,
+        handler: Handler | None = None,
+        mem: Memory | None = None,
         latency: int = 0,
         accept_delay: int = 0,
         **kwargs,
@@ -69,8 +69,8 @@ class XifDevice(XifBase):
         self.accept_delay = accept_delay
 
         self._ids = IdAllocator(self.id_width)
-        self._issue_queue: Deque[XifInsn] = deque()
-        self._pending: Dict[int, XifInsn] = {}
+        self._issue_queue: deque[XifInsn] = deque()
+        self._pending: dict[int, XifInsn] = {}
 
         self._init_device_signals()
 
