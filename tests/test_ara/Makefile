@@ -105,7 +105,6 @@ EXT_VERILOG_SOURCES += \
 	$(FPU_DIR)/div_sqrt_mvp_wrapper.sv \
 	$(FPU_DIR)/div_sqrt_top_mvp.sv \
 	$(TC_DIR)/tc_sram.sv \
-	$(TC_DIR)/tc_sram_impl.sv \
 	$(TC_DIR)/tc_clk.sv \
 	$(CC_DIR)/stream_register.sv \
 	$(CC_DIR)/rr_arb_tree.sv \

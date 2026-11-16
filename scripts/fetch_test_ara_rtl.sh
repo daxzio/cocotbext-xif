@@ -55,5 +55,6 @@ clone_if_missing axi https://github.com/pulp-platform/axi.git "v${AXI_VER}" \
 clone_if_missing common_cells https://github.com/pulp-platform/common_cells.git v1.37.0 \
     "$RTL/common_cells/src/cf_math_pkg.sv"
 
-clone_if_missing tech_cells_generic https://github.com/pulp-platform/tech_cells_generic.git v0.2.2 \
+# tc_sram_impl appears from v0.2.10; pin matches vendored Bender metadata under tests/rtl/tech_cells_generic.
+clone_if_missing tech_cells_generic https://github.com/pulp-platform/tech_cells_generic.git v0.2.13 \
     "$RTL/tech_cells_generic/src/rtl/tc_sram.sv"
