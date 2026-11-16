@@ -7,7 +7,13 @@ Only the coprocessor is instantiated, with **XIF at the top** (issue, commit, re
 
 ## One-time setup
 
-In `tests/rtl/ara/hardware`: run `make checkout` and `make apply-patches`.
+From the repo root, fetch pulp AXI / common_cells / tech_cells sources (not stored in git):
+
+```bash
+bash scripts/fetch_test_ara_rtl.sh
+```
+
+Optionally, in `tests/rtl/ara/hardware`: run `make checkout` and `make apply-patches` for a full Ara hardware tree.
 
 ## Verilator version
 

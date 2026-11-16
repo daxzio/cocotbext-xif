@@ -12,6 +12,10 @@ ARA_CVA6_CONFIG := $(CURDIR)/$(ARA_ROOT)/hardware/deps/cva6/core/include/config_
 #   ARA_ROOT := ../rtl/ara.bck
 # endif
 ASIC_DIR := ../rtl
+AXI_DIR := $(ASIC_DIR)/axi/src
+CC_DIR := $(ASIC_DIR)/common_cells/src
+TC_DIR := $(ASIC_DIR)/tech_cells_generic/src/rtl
+FPU_DIR := $(ARA_ROOT)/hardware/deps/fpnew/src/fpu_div_sqrt_mvp/hdl
 
 TOPLEVEL = ara_xif_wrapper
 MODULE = test_dut
@@ -43,34 +47,34 @@ EXT_VERILOG_SOURCES += \
 
 # ---------- AXI (pkg + intf for types; axi_cut, axi_to_detailed_mem, axi_zero_mem) ----------
 EXT_VERILOG_SOURCES += \
-	$(ASIC_DIR)/axi/axi_pkg.sv \
-	$(ASIC_DIR)/axi/axi_intf.sv \
-	$(ASIC_DIR)/axi/axi_cut.sv \
-	$(ASIC_DIR)/axi/axi_to_detailed_mem.sv \
-	$(ASIC_DIR)/axi/axi_zero_mem.sv
+	$(AXI_DIR)/axi_pkg.sv \
+	$(AXI_DIR)/axi_intf.sv \
+	$(AXI_DIR)/axi_cut.sv \
+	$(AXI_DIR)/axi_to_detailed_mem.sv \
+	$(AXI_DIR)/axi_zero_mem.sv
 
 # ---------- Common cells (from hierarchy + packages/deps needed by above) ----------
 EXT_VERILOG_SOURCES += \
-	$(ASIC_DIR)/common_cells/cf_math_pkg.sv \
-	$(ASIC_DIR)/common_cells/spill_register.sv \
-	$(ASIC_DIR)/common_cells/spill_register_flushable.sv \
-	$(ASIC_DIR)/common_cells/stream_fifo.sv \
-	$(ASIC_DIR)/common_cells/stream_fork.sv \
-	$(ASIC_DIR)/common_cells/stream_fork_dynamic.sv \
-	$(ASIC_DIR)/common_cells/stream_join.sv \
-	$(ASIC_DIR)/common_cells/stream_join_dynamic.sv \
-	$(ASIC_DIR)/common_cells/stream_to_mem.sv \
-	$(ASIC_DIR)/common_cells/stream_mux.sv \
-	$(ASIC_DIR)/common_cells/stream_demux.sv \
-	$(ASIC_DIR)/common_cells/stream_xbar.sv \
-	$(ASIC_DIR)/common_cells/stream_intf.sv \
-	$(ASIC_DIR)/common_cells/mem_to_banks_detailed.sv \
-	$(ASIC_DIR)/common_cells/lzc.sv \
-	$(ASIC_DIR)/common_cells/popcount.sv \
-	$(ASIC_DIR)/common_cells/fifo_v3.sv \
-	$(ASIC_DIR)/common_cells/delta_counter.sv \
-	$(ASIC_DIR)/common_cells/counter.sv \
-	$(ASIC_DIR)/common_cells/fall_through_register.sv
+	$(CC_DIR)/cf_math_pkg.sv \
+	$(CC_DIR)/spill_register.sv \
+	$(CC_DIR)/spill_register_flushable.sv \
+	$(CC_DIR)/stream_fifo.sv \
+	$(CC_DIR)/stream_fork.sv \
+	$(CC_DIR)/stream_fork_dynamic.sv \
+	$(CC_DIR)/stream_join.sv \
+	$(CC_DIR)/stream_join_dynamic.sv \
+	$(CC_DIR)/stream_to_mem.sv \
+	$(CC_DIR)/stream_mux.sv \
+	$(CC_DIR)/stream_demux.sv \
+	$(CC_DIR)/stream_xbar.sv \
+	$(CC_DIR)/stream_intf.sv \
+	$(CC_DIR)/mem_to_banks_detailed.sv \
+	$(CC_DIR)/lzc.sv \
+	$(CC_DIR)/popcount.sv \
+	$(CC_DIR)/fifo_v3.sv \
+	$(CC_DIR)/delta_counter.sv \
+	$(CC_DIR)/counter.sv \
+	$(CC_DIR)/fall_through_register.sv
 
 # ---------- FPnew (ara_pkg + lane vmfpu), tech_cells (VRF), common_cells extras ----------
 FPNEW := $(ASIC_DIR)/ara/hardware/deps/fpnew
@@ -92,20 +96,20 @@ EXT_VERILOG_SOURCES += \
 	$(FPNEW)/src/fpnew_sdotp_multi.sv \
 	$(FPNEW)/src/fpnew_sdotp_multi_wrapper.sv \
 	$(FPNEW)/src/fpnew_top.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/defs_div_sqrt_mvp.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/control_mvp.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/preprocess_mvp.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/iteration_div_sqrt_mvp.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/norm_div_sqrt_mvp.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/nrbd_nrsc_mvp.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/div_sqrt_mvp_wrapper.sv \
-	$(ASIC_DIR)/fpu_div_sqrt_mvp/div_sqrt_top_mvp.sv \
-	$(ASIC_DIR)/tech_cells_generic/tc_sram.sv \
-	$(ASIC_DIR)/tech_cells_generic/tc_sram_impl.sv \
-	$(ASIC_DIR)/tech_cells_generic/tc_clk.sv \
-	$(ASIC_DIR)/common_cells/stream_register.sv \
-	$(ASIC_DIR)/common_cells/rr_arb_tree.sv \
-	$(ASIC_DIR)/common_cells/mem_to_banks.sv
+	$(FPU_DIR)/defs_div_sqrt_mvp.sv \
+	$(FPU_DIR)/control_mvp.sv \
+	$(FPU_DIR)/preprocess_mvp.sv \
+	$(FPU_DIR)/iteration_div_sqrt_mvp.sv \
+	$(FPU_DIR)/norm_div_sqrt_mvp.sv \
+	$(FPU_DIR)/nrbd_nrsc_mvp.sv \
+	$(FPU_DIR)/div_sqrt_mvp_wrapper.sv \
+	$(FPU_DIR)/div_sqrt_top_mvp.sv \
+	$(TC_DIR)/tc_sram.sv \
+	$(TC_DIR)/tc_sram_impl.sv \
+	$(TC_DIR)/tc_clk.sv \
+	$(CC_DIR)/stream_register.sv \
+	$(CC_DIR)/rr_arb_tree.sv \
+	$(CC_DIR)/mem_to_banks.sv
 
 # ---------- Ara coprocessor RTL (from hierarchy, deduplicated) ----------
 # ara_dispatcher: path factored out so sv2v can use a patched copy (enum .next on

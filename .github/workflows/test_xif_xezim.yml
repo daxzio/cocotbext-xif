@@ -36,6 +36,8 @@ jobs:
           dest="$(cocotb-config --makefiles)/simulators"
           cp .github/xezim/Makefile.xezim "${dest}/Makefile.xezim"
           test -f "${dest}/Makefile.xezim"
+      - name: Fetch test_ara RTL dependencies
+        run: bash scripts/fetch_test_ara_rtl.sh
       - name: Run all XIF cocotb suites (xezim)
         env:
           XEZIM_MAX_TIME: 60s
