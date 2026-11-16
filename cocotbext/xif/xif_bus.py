@@ -1,10 +1,10 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from .bus import Bus
 
 
 class XifBus(Bus):
-    _signals: ClassVar[list[str]] = [
+    SIGNAL_NAMES: ClassVar[list[str]] = [
         "issue_valid",
         "issue_ready",
         "issue_req_instr",
@@ -47,7 +47,7 @@ class XifBus(Bus):
         "result_exc",
         "result_exccode",
     ]
-    _optional_signals: ClassVar[list[str]] = [
+    OPTIONAL_SIGNAL_NAMES: ClassVar[list[str]] = [
         "issue_req_rs_2",
         "issue_req_ecs",
         "issue_req_ecs_valid",
@@ -115,9 +115,9 @@ class XifBus(Bus):
         self, entity=None, prefix=None, signals=None, optional_signals=None, **kwargs
     ):
         if signals is None:
-            signals = self._signals
+            signals = self.SIGNAL_NAMES
         if optional_signals is None:
-            optional_signals = self._optional_signals
+            optional_signals = self.OPTIONAL_SIGNAL_NAMES
         super().__init__(
             entity, prefix, signals, optional_signals=optional_signals, **kwargs
         )
@@ -129,6 +129,14 @@ class XifBus(Bus):
     @classmethod
     def from_prefix(cls, entity, prefix, **kwargs):
         return cls(entity, prefix, **kwargs)
+
+    if TYPE_CHECKING:
+        issue_req_rs_0: Any
+        issue_req_id: Any
+        issue_req_rs_valid: Any
+        mem_req_wdata: Any
+        mem_req_addr: Any
+        mem_req_be: Any
 
     @property
     def has_rs_2(self) -> bool:

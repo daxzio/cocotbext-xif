@@ -123,7 +123,7 @@ class XifMonitor(XifBase):
             await RisingEdge(self.clock)
             await ReadOnly()
             self._sample_bus()
-            cycle = get_sim_time("ns")
+            cycle = int(get_sim_time("ns"))
 
             if self._issue_valid and not self._issue_ready:
                 stall_timeout += 1

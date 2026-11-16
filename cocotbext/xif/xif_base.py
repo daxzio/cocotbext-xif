@@ -78,8 +78,9 @@ class XifBase:
             self.log.info(f"  Mem data width: {self.mem_data_width} bits")
 
         self.log.debug("XIF signals:")
+        bus_cls = type(self.bus)
         for sig in sorted(
-            set().union(self.bus._signals, self.bus._optional_signals)
+            set().union(bus_cls.SIGNAL_NAMES, bus_cls.OPTIONAL_SIGNAL_NAMES)
         ):
             if not hasattr(self.bus, sig):
                 self.log.debug(f"  {sig}: not present")
