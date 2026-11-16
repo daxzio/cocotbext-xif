@@ -40,6 +40,8 @@ class XifBase:
         reset_active_level: bool = False,
         **kwargs,
     ) -> None:
+        log_quiet = kwargs.pop("log_quiet", False)
+
         self.name = name
         self.bus = bus
         self.clock = clock
@@ -50,11 +52,7 @@ class XifBase:
             self.log = logging.getLogger(f"cocotb.xif_{name}.{bus._name}")
         else:
             self.log = logging.getLogger(f"cocotb.xif_{name}")
-        self.log.setLevel(logging.INFO)
-        self.log.info(f"XIF {self.name}")
-        self.log.info(f"cocotbext-xif version {__version__}")
-        self.log.info(f"Copyright (c) 2024-{datetime.datetime.now().year} Daxzio")
-        self.log.info("https://github.com/daxzio/cocotbext-xif")
+        self.log.setLevel(logging.WARNING if log_quiet else logging.INFO)
 
         self.id_width = bus.id_width
         self.id_mask = (1 << self.id_width) - 1 if self.id_width else 0
@@ -68,11 +66,16 @@ class XifBase:
         self.mem_be_width = bus.mem_be_width
         self.mem_addr_width = bus.mem_addr_width
 
-        self.log.info(f"XIF {self.name} configuration:")
-        self.log.info(f"  XLEN: {self.xlen} bits")
-        self.log.info(f"  ID width: {self.id_width} bits")
-        self.log.info(f"  RS count: {self.rs_count}")
-        self.log.info(f"  Mem data width: {self.mem_data_width} bits")
+        if not log_quiet:
+            self.log.info(f"XIF {self.name}")
+            self.log.info(f"cocotbext-xif version {__version__}")
+            self.log.info(f"Copyright (c) 2024-{datetime.datetime.now().year} Daxzio")
+            self.log.info("https://github.com/daxzio/cocotbext-xif")
+            self.log.info(f"XIF {self.name} configuration:")
+            self.log.info(f"  XLEN: {self.xlen} bits")
+            self.log.info(f"  ID width: {self.id_width} bits")
+            self.log.info(f"  RS count: {self.rs_count}")
+            self.log.info(f"  Mem data width: {self.mem_data_width} bits")
 
         self.log.debug("XIF signals:")
         for sig in sorted(
@@ -91,10 +94,12 @@ class XifBase:
                 self.log.debug(f"  {sig}: present (non-sized)")
 
     def enable_logging(self) -> None:
+        """Per-transaction and configuration detail (logger level DEBUG)."""
         self.log.setLevel(logging.DEBUG)
 
     def disable_logging(self) -> None:
-        self.log.setLevel(logging.INFO)
+        """Default for passive monitor: warnings and errors only."""
+        self.log.setLevel(logging.WARNING)
 
     def mask_x(self, value: int) -> int:
         return value & self.x_mask

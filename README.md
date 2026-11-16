@@ -128,12 +128,12 @@ from cocotbext.xif import XifBus, XifMonitor
 
 bus = XifBus.from_prefix(dut, "s_xif")
 monitor = XifMonitor(bus, dut.clk_i, check_protocol=True)
-monitor.enable_logging()
+monitor.enable_logging()  # default monitor is quiet (records only); opt in for per-issue DEBUG lines
 ```
 
 #### Methods
 
-* `enable_logging()` / `disable_logging()`
+* `enable_logging()` / `disable_logging()` — default monitor level is WARNING (no banner, no per-issue spam)
 * `enable_check_sync()`: check that signal changes align with the clock edge
 * `disable_check_sync()`: disable the synchronous signal check
 

@@ -48,8 +48,7 @@ class XifMonitor(XifBase):
     """Passive observer for all four XIF channels."""
 
     def __init__(self, bus, clock, check_protocol: bool = False, **kwargs) -> None:
-        super().__init__(bus, clock, name="monitor", **kwargs)
-        self.disable_logging()
+        super().__init__(bus, clock, name="monitor", log_quiet=True, **kwargs)
         self.check_protocol = check_protocol
         self.timeout_max = 1000
 
@@ -172,7 +171,7 @@ class XifMonitor(XifBase):
                     },
                 )
                 self.records.append(rec)
-                self.log.info(
+                self.log.debug(
                     "Issue id=%d instr=0x%08x mode=%d rs0=0x%x rs1=0x%x rs_valid=%d",
                     txn_id,
                     self._issue_req_instr,

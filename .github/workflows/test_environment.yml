@@ -1,8 +1,7 @@
 name: Check cached Setup
 
+# Scheduled smoke disabled — use workflow_dispatch when exercising setup actions.
 on:
-  schedule:
-    - cron: '0 1 * * *'
   workflow_dispatch:
 
 jobs:
