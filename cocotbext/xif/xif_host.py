@@ -160,6 +160,7 @@ class XifHost(XifBase):
         timeout = 0
         while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
             await RisingEdge(self.clock)
+            await ReadOnly()
             timeout += 1
         if timeout >= self.timeout_max:
             raise TimeoutError(
@@ -203,6 +204,7 @@ class XifHost(XifBase):
         timeout = 0
         while not insn.accepted and timeout < self.timeout_max:
             await RisingEdge(self.clock)
+            await ReadOnly()
             timeout += 1
         if not insn.accepted:
             raise TimeoutError(
@@ -268,6 +270,7 @@ class XifHost(XifBase):
             timeout = 0
             while int(self.bus.issue_ready.value) != 1 and timeout < self.timeout_max:
                 await RisingEdge(self.clock)
+                await ReadOnly()
                 timeout += 1
             if timeout >= self.timeout_max:
                 self._clear_issue_req()
@@ -301,6 +304,7 @@ class XifHost(XifBase):
         await self._wait_reset_release()
         while True:
             await RisingEdge(self.clock)
+            await ReadOnly()
             if int(self.bus.result_valid.value) != 1:
                 continue
             if int(self.bus.result_ready.value) != 1:
@@ -349,6 +353,7 @@ class XifHost(XifBase):
         await self._wait_reset_release()
         while True:
             await RisingEdge(self.clock)
+            await ReadOnly()
             if int(self.bus.mem_valid.value) != 1:
                 continue
             if int(self.bus.mem_ready.value) != 1:

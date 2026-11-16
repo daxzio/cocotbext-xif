@@ -25,7 +25,7 @@ Keep `WAVES=0`. `WAVES=1` adds `--trace --trace-fst --trace-structs` on top of t
 
 ## Run
 
-From `tests/test_ara`: `make sim` (with venv activated). Builds the explicit RTL list in the Makefile and runs **test_ara_smoke**, **test_ara_xif_ready**, **test_ara_vsetvli**, **test_ara_vsetivli**, and **test_ara_vsetvl**. `xif_helpers.py` in this directory is a symlink to `tests/xif_helpers.py`. Verilator build uses parallel C++ jobs and no trace by default; use `WAVES=1` for a waveform dump. After a successful build, `make retest SIM=verilator` re-runs the tests without recompiling.
+From `tests/test_ara`: `make sim` (with venv activated). Builds the explicit RTL list in the Makefile and runs **test_ara_smoke**, **test_ara_xif_ready**, **test_ara_vsetvli**, **test_ara_vsetivli**, and **test_ara_vsetvl**. On **`SIM=xezim`**, **test_ara_vsetvli** and **test_ara_vsetvl** are skipped until XIF result writeback matches Verilator (the other three tests still run). `xif_helpers.py` in this directory is a symlink to `tests/xif_helpers.py`. Verilator build uses parallel C++ jobs and no trace by default; use `WAVES=1` for a waveform dump. After a successful build, `make retest SIM=verilator` re-runs the tests without recompiling.
 
 ## Icarus (sv2v + iverilog)
 
