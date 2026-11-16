@@ -5,3 +5,4 @@ pyflakes
 ruff
 mypy
 pre-commit
+cocotbext-apb
