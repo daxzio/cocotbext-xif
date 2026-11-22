@@ -20,7 +20,7 @@ jobs:
       # v2 + version: 5.050 returned 404 on ubuntu-26.04 (2026-11). v1 installs
       # a prebuilt Verilator; tests/test_ara still enforces 5.050 via Makefile when possible.
       - name: Setup Verilator
-        uses: veryl-lang/setup-verilator@v1
+        uses: veryl-lang/setup-verilator@v2
       - name: Report Verilator
         run: verilator --version
       - name: Set up Python ${{ matrix.python-version }}
