@@ -5,6 +5,10 @@ on:
   pull_request:
   schedule:
     - cron: "0 3 * * 0"
+  # Fan-out from daxzio/setup-xezim after xezim-package marks a release Latest.
+  repository_dispatch:
+    types: [xezim-release]
+  workflow_dispatch:
 
 jobs:
   xif_xezim:
@@ -17,6 +21,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      - name: Log xezim package release
+        if: github.event_name == 'repository_dispatch'
+        run: echo "xezim package ${{ github.event.client_payload.tag }} from ${{ github.event.client_payload.source }}"
       - name: Setup xezim
         uses: daxzio/setup-xezim@v1
       - name: Report xezim
